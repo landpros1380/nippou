@@ -286,13 +286,26 @@
   .toast.show { transform: translateX(-50%) translateY(0); }
 
   /* 一覧 */
-  .filter-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .filter-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
   .filter-row input, .filter-row select {
     padding: 10px 13px; border: 1px solid var(--border);
     border-radius: 8px; font-family: inherit; font-size: 13px;
     background: var(--card); color: var(--text); -webkit-appearance: none;
   }
   .filter-row input:focus, .filter-row select:focus { outline: none; border-color: var(--highlight); }
+  .list-print-btn {
+    padding: 10px 16px; border: 1px solid var(--highlight);
+    border-radius: 8px; font-family: inherit; font-size: 13px;
+    background: var(--highlight); color: #fff; cursor: pointer; white-space: nowrap;
+    transition: opacity 0.2s;
+  }
+  .list-print-btn:hover { opacity: 0.8; }
+  .modal-print-btn {
+    padding: 5px 12px; border: 1px solid var(--border);
+    border-radius: 7px; font-family: inherit; font-size: 12px;
+    background: var(--card2); color: var(--text); cursor: pointer; transition: opacity 0.2s;
+  }
+  .modal-print-btn:hover { opacity: 0.8; }
 
   .report-card {
     background: var(--card); border: 1px solid var(--border); border-radius: 14px;
@@ -718,9 +731,16 @@
 
   <!-- ===== 一覧 ===== -->
   <div id="page-list" class="page">
-    <div class="filter-row">
+    <div class="filter-row" style="grid-template-columns:1fr auto;margin-bottom:10px;">
       <input type="month" id="filter-month" onchange="renderList()">
-      <input type="text" id="filter-site" placeholder="🔍 現場名で絞り込み" oninput="renderList()">
+      <button class="list-print-btn" onclick="printList()">🖨️ 印刷</button>
+    </div>
+    <div class="filter-row" style="margin-bottom:10px;">
+      <select id="filter-client" onchange="renderList()"><option value="">元請先：すべて</option></select>
+      <select id="filter-site"   onchange="renderList()"><option value="">現場名：すべて</option></select>
+    </div>
+    <div class="filter-row" style="grid-template-columns:1fr;margin-bottom:14px;">
+      <select id="filter-worker" onchange="renderList()"><option value="">作業員：すべて</option></select>
     </div>
     <div id="report-list"></div>
   </div>
@@ -941,7 +961,10 @@
   <div class="modal-box">
     <div class="modal-header">
       <h3 id="modal-title">日報詳細</h3>
-      <button class="modal-close" onclick="closeModalDirect()">×</button>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button class="modal-print-btn" onclick="printDetail()">🖨️ 印刷</button>
+        <button class="modal-close" onclick="closeModalDirect()">×</button>
+      </div>
     </div>
     <div class="modal-content" id="modal-content"></div>
   </div>
@@ -1959,12 +1982,39 @@ function resetForm() {
 }
 
 // ===== 一覧 =====
+function fillFilterDropdown(id, options, placeholder) {
+  const sel = $(id);
+  const prev = sel.value;
+  sel.innerHTML = `<option value="">${placeholder}</option>`;
+  options.sort().forEach(opt => {
+    const o = document.createElement('option');
+    o.value = opt; o.textContent = opt;
+    if (opt === prev) o.selected = true;
+    sel.appendChild(o);
+  });
+}
+
 function renderList() {
-  const month = $('filter-month').value;
-  const site  = $('filter-site').value.trim();
-  let reports = getData('reports', []);
-  if (month) reports = reports.filter(r => r.date?.startsWith(month));
-  if (site)  reports = reports.filter(r => r.site?.includes(site));
+  const all    = getData('reports', []);
+  const month  = $('filter-month').value;
+  const client = $('filter-client').value;
+  const site   = $('filter-site').value;
+  const worker = $('filter-worker').value;
+
+  // プルダウン選択肢を全データから生成
+  fillFilterDropdown('filter-client',
+    [...new Set(all.map(r => r.client).filter(Boolean))], '元請先：すべて');
+  fillFilterDropdown('filter-site',
+    [...new Set(all.map(r => r.site).filter(Boolean))], '現場名：すべて');
+  fillFilterDropdown('filter-worker',
+    [...new Set(all.flatMap(r => (r.workers||[]).map(w => w.name)).filter(Boolean))], '作業員：すべて');
+
+  // フィルタリング
+  let reports = all;
+  if (month)  reports = reports.filter(r => r.date?.startsWith(month));
+  if (client) reports = reports.filter(r => r.client === client);
+  if (site)   reports = reports.filter(r => r.site === site);
+  if (worker) reports = reports.filter(r => (r.workers||[]).some(w => w.name === worker));
 
   const cont = $('report-list');
   if (!reports.length) {
@@ -1999,6 +2049,83 @@ function renderList() {
   });
 }
 
+function printList() {
+  const all    = getData('reports', []);
+  const month  = $('filter-month').value;
+  const client = $('filter-client').value;
+  const site   = $('filter-site').value;
+  const worker = $('filter-worker').value;
+
+  let reports = all;
+  if (month)  reports = reports.filter(r => r.date?.startsWith(month));
+  if (client) reports = reports.filter(r => r.client === client);
+  if (site)   reports = reports.filter(r => r.site === site);
+  if (worker) reports = reports.filter(r => (r.workers||[]).some(w => w.name === worker));
+
+  const conds = [month, client, site, worker ? `作業員：${worker}` : ''].filter(Boolean);
+  const title = 'LAND PROS 作業日報一覧' + (conds.length ? '　' + conds.join(' / ') : '');
+
+  const rows = reports.map(r => `
+    <tr>
+      <td>${r.date||''}</td>
+      <td>${r.client||'-'}</td>
+      <td>${r.site||'-'}</td>
+      <td>${r.workType||'-'}</td>
+      <td>${(r.workers||[]).map(w=>w.name).join('、')||'-'}</td>
+      <td>${r.hoursText||'-'}</td>
+    </tr>`).join('');
+
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8"><title>${title}</title>
+<style>
+  body { font-family: 'Helvetica Neue',Arial,'Hiragino Kaku Gothic ProN',sans-serif; font-size: 12px; margin: 20px; color: #333; }
+  h2 { font-size: 15px; margin-bottom: 4px; }
+  .sub { font-size: 10px; color: #888; margin-bottom: 14px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { background: #333; color: #fff; padding: 7px 8px; text-align: left; font-size: 11px; }
+  td { border: 1px solid #ddd; padding: 6px 8px; }
+  tr:nth-child(even) td { background: #f8f8f8; }
+  @media print { @page { margin: 10mm; } }
+</style></head><body>
+<h2>${title}</h2>
+<div class="sub">印刷日時：${new Date().toLocaleString('ja-JP')}　全${reports.length}件</div>
+<table>
+  <thead><tr>
+    <th>日付</th><th>元請先</th><th>現場名</th><th>作業内容</th><th>作業員</th><th>実働時間</th>
+  </tr></thead>
+  <tbody>${rows}</tbody>
+</table>
+</body></html>`);
+  win.document.close();
+  win.focus();
+  win.print();
+}
+
+function printDetail() {
+  const content = $('modal-content').innerHTML;
+  const title   = $('modal-title').textContent;
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8"><title>${title}</title>
+<style>
+  body { font-family: 'Helvetica Neue',Arial,'Hiragino Kaku Gothic ProN',sans-serif; font-size: 13px; margin: 24px; color: #333; }
+  h2 { font-size: 15px; border-bottom: 2px solid #333; padding-bottom: 6px; margin-bottom: 16px; }
+  .detail-row { display: flex; gap: 10px; border-bottom: 1px solid #e0e0e0; padding: 7px 0; }
+  .detail-label { font-weight: bold; color: #777; min-width: 90px; font-size: 11px; flex-shrink: 0; }
+  .detail-value { flex: 1; }
+  .worker-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .worker-chip { border: 1px solid #ccc; border-radius: 20px; padding: 2px 8px; font-size: 11px; }
+  @media print { @page { margin: 10mm; } }
+</style></head><body>
+<h2>${title}</h2>
+${content}
+</body></html>`);
+  win.document.close();
+  win.focus();
+  win.print();
+}
+
 function deleteReport(id, e) {
   e.stopPropagation();
   if (!confirm('この日報を削除しますか？')) return;
@@ -2028,7 +2155,7 @@ function showDetail(r) {
     <div class="detail-row"><div class="detail-label">器具</div><div class="detail-value">${(r.tools||[]).length ? r.tools.join('、') : '－'}</div></div>
     <div class="detail-row"><div class="detail-label">リース</div><div class="detail-value">${(r.leases||[]).length ? r.leases.join('、') : '－'}</div></div>
     <div class="detail-row"><div class="detail-label">ETCカード</div><div class="detail-value">${r.etcNone ? '－' : (r.etcCard || '－')}</div></div>
-    ${!r.etcNone && r.etcVehicle ? `<div class="detail-row"><div class="detail-label">車両区分</div><div class="detail-value">${r.etcVehicle}</div></div>` : ''}
+    ${r.etcVehicle && r.etcCard && !r.etcNone ? `<div class="detail-row"><div class="detail-label">車両区分</div><div class="detail-value">${r.etcVehicle}</div></div>` : ''}
     ${!r.etcNone && etcText ? `<div class="detail-row"><div class="detail-label">ETC区間</div><div class="detail-value">${etcText}</div></div>` : ''}
     ${(r.slips||[]).length?`<div class="detail-row"><div class="detail-label">伝票無し</div><div class="detail-value">${r.slips.map(s=>typeof s==='string'?s:(s.qty?`${s.name}（${s.qty}）`:s.name)).join('、')}</div></div>`:''}
     <div class="detail-row"><div class="detail-label">外注依頼</div><div class="detail-value">${r.outsource||'-'}${r.outsource==='有'?' （'+(r.outsourceCo||'')+(r.outsourceOther?'/'+r.outsourceOther:'')+'）':''}</div></div>
