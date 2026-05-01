@@ -1,0 +1,2116 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>作業日報 - LAND PROS</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap');
+
+  :root {
+    --primary: #2c2c2e;
+    --primary2: #3a3a3c;
+    --accent: #636366;
+    --accent2: #48484a;
+    --highlight: #aeaeb2;
+    --bg: #1c1c1e;
+    --bg2: #2c2c2e;
+    --card: #2c2c2e;
+    --card2: #3a3a3c;
+    --border: #48484a;
+    --border2: #636366;
+    --text: #f2f2f7;
+    --text2: #e5e5ea;
+    --muted: #aeaeb2;
+    --muted2: #8e8e93;
+    --success: #32d74b;
+    --danger: #ff453a;
+    --gold: #ffd60a;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Noto Sans JP', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+  }
+
+  /* ヘッダー＋タブ固定バー */
+  .top-bar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    background: var(--primary);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+  }
+  .app-header {
+    background: var(--primary);
+    color: var(--text);
+    padding: 14px 18px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+  .app-header-title {
+    font-size: 17px; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--text);
+  }
+  .app-header-sub { font-size: 11px; color: var(--muted); margin-top: 1px; letter-spacing: 0.05em; }
+  .header-logo {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+    border: 1px solid var(--border2); color: var(--muted);
+    padding: 4px 10px; border-radius: 20px;
+  }
+
+  /* タブ */
+  .tabs {
+    display: flex; background: var(--primary);
+    border-bottom: 1px solid var(--border);
+  }
+  .tab-btn {
+    flex: 1; padding: 12px 4px; border: none; background: transparent;
+    color: var(--muted2); font-size: 12px; font-family: inherit;
+    cursor: pointer; transition: all 0.2s; font-weight: 500; letter-spacing: 0.03em;
+  }
+  .tab-btn.active {
+    color: var(--text); background: rgba(255,255,255,0.05);
+    border-bottom: 2px solid var(--highlight);
+  }
+
+  .content { padding: 14px; max-width: 600px; margin: 0 auto; padding-top: 110px; }
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* カード */
+  .card {
+    background: var(--card); border-radius: 14px;
+    border: 1px solid var(--border);
+    margin-bottom: 12px; overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  }
+  .card-header {
+    background: var(--card2);
+    color: var(--muted);
+    padding: 9px 16px;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.12em;
+    display: flex; align-items: center; gap: 7px;
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+  }
+  .card-body { padding: 16px; }
+
+  /* フォーム */
+  .form-row { margin-bottom: 14px; }
+  .form-row label {
+    display: block; font-size: 11px; font-weight: 700;
+    color: var(--muted); margin-bottom: 5px;
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .form-row input, .form-row select, .form-row textarea {
+    width: 100%; padding: 10px 13px;
+    border: 1px solid var(--border);
+    border-radius: 8px; font-family: inherit; font-size: 14px;
+    color: var(--text); background: var(--bg2);
+    transition: border-color 0.2s, box-shadow 0.2s;
+    -webkit-appearance: none;
+  }
+  .form-row input:focus, .form-row select:focus, .form-row textarea:focus {
+    outline: none; border-color: var(--highlight);
+    box-shadow: 0 0 0 3px rgba(174,174,178,0.15); background: var(--card2);
+  }
+  .form-row textarea { min-height: 80px; resize: vertical; }
+  .form-row select option { background: var(--card2); color: var(--text); }
+
+  .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .form-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+
+  /* 実働時間 */
+  .hours-display {
+    padding: 10px 13px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--bg2); font-size: 15px; font-weight: 700;
+    color: var(--text); letter-spacing: 0.03em;
+  }
+
+  /* ラジオ */
+  .radio-group { display: flex; gap: 8px; }
+  .radio-label {
+    display: flex; align-items: center; cursor: pointer;
+    padding: 9px 14px; border: 1px solid var(--border); border-radius: 8px;
+    font-size: 14px; flex: 1; justify-content: center; transition: all 0.2s;
+    color: var(--muted); background: var(--bg2);
+  }
+  .radio-label input { display: none; }
+  .radio-label.checked {
+    border-color: var(--highlight); background: var(--card2);
+    color: var(--text); font-weight: 700;
+  }
+
+  /* 作業員 */
+  .worker-list { display: flex; flex-direction: column; gap: 8px; }
+  .worker-item {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 8px 10px;
+  }
+  .worker-item select {
+    flex: 1; padding: 7px 10px; border: 1px solid var(--border);
+    border-radius: 7px; font-family: inherit; font-size: 14px;
+    background: var(--card2); color: var(--text); -webkit-appearance: none;
+  }
+  .worker-item select:focus { outline: none; border-color: var(--highlight); box-shadow: 0 0 0 3px rgba(174,174,178,0.15); }
+  .worker-item select option { background: var(--card2); }
+  .worker-check { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted2); white-space: nowrap; }
+  .worker-check input[type="checkbox"] { width: 18px; height: 18px; cursor: pointer; accent-color: var(--highlight); }
+  .item-remove { background: none; border: none; color: var(--muted2); font-size: 18px; cursor: pointer; line-height: 1; padding: 0 2px; flex-shrink: 0; transition: color 0.2s; }
+  .item-remove:hover { color: var(--danger); }
+
+  /* 機材 */
+  .equip-section { margin-bottom: 14px; }
+  .equip-section-label {
+    font-size: 11px; font-weight: 700; color: var(--muted);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between;
+  }
+  .equip-list { display: flex; flex-direction: column; gap: 6px; }
+  .equip-item {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 9px; padding: 7px 10px;
+  }
+  .equip-item select {
+    flex: 1; padding: 6px 10px; border: 1px solid var(--border);
+    border-radius: 7px; font-family: inherit; font-size: 13px;
+    background: var(--card2); color: var(--text); -webkit-appearance: none;
+  }
+  .equip-item select:focus { outline: none; border-color: var(--highlight); box-shadow: 0 0 0 3px rgba(174,174,178,0.15); }
+  .equip-item select option { background: var(--card2); }
+
+  /* リスト */
+  .list-items { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+  .list-item { display: flex; gap: 8px; align-items: center; }
+  .list-item input {
+    flex: 1; padding: 8px 10px; border: 1px solid var(--border);
+    border-radius: 8px; font-family: inherit; font-size: 13px;
+    background: var(--bg2); color: var(--text);
+  }
+  .list-item input:focus { outline: none; border-color: var(--highlight); box-shadow: 0 0 0 3px rgba(174,174,178,0.15); background: var(--card2); }
+  .remove-btn { background: none; border: none; color: var(--muted2); font-size: 18px; cursor: pointer; line-height: 1; padding: 0 4px; flex-shrink: 0; transition: color 0.2s; }
+  .remove-btn:hover { color: var(--danger); }
+
+  .add-btn {
+    background: none; border: 1px dashed var(--border); color: var(--muted2);
+    padding: 8px 12px; border-radius: 8px; font-family: inherit; font-size: 12px;
+    cursor: pointer; width: 100%; transition: all 0.2s; letter-spacing: 0.03em;
+  }
+  .add-btn:hover { border-color: var(--highlight); color: var(--text); background: rgba(255,255,255,0.04); }
+
+  .add-btn-small {
+    background: none; border: 1px dashed var(--border); color: var(--muted2);
+    padding: 3px 10px; border-radius: 5px; font-family: inherit; font-size: 11px;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .add-btn-small:hover { border-color: var(--highlight); color: var(--text); }
+
+  /* ETC区間 */
+  .etc-route-item {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px; margin-bottom: 8px;
+  }
+  .etc-route-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+  .etc-route-row select, .etc-route-row input {
+    padding: 7px 9px; border: 1px solid var(--border);
+    border-radius: 7px; font-family: inherit; font-size: 13px;
+    background: var(--card2); color: var(--text); -webkit-appearance: none;
+  }
+  .etc-route-row select:focus, .etc-route-row input:focus {
+    outline: none; border-color: var(--highlight); box-shadow: 0 0 0 3px rgba(174,174,178,0.15);
+  }
+  .etc-route-row select option { background: var(--card2); }
+  .etc-arrow { color: var(--muted2); font-size: 16px; flex-shrink: 0; }
+  .etc-amount-row { display: flex; align-items: center; gap: 8px; }
+  .etc-amount-row input {
+    flex: 1; padding: 7px 9px; border: 1px solid var(--border);
+    border-radius: 7px; font-family: inherit; font-size: 13px;
+    background: var(--card2); color: var(--text);
+  }
+  .etc-amount-row input:focus { outline: none; border-color: var(--highlight); box-shadow: 0 0 0 3px rgba(174,174,178,0.15); }
+  .etc-amount-label { font-size: 12px; color: var(--muted2); white-space: nowrap; }
+  .etc-auto-badge {
+    font-size: 10px; background: rgba(50,215,75,0.15); color: var(--success);
+    border-radius: 4px; padding: 2px 6px; white-space: nowrap; border: 1px solid rgba(50,215,75,0.3);
+  }
+
+  /* 外注 */
+  .toggle-group { display: flex; gap: 8px; }
+  .toggle-label {
+    padding: 8px 20px; border: 1px solid var(--border);
+    border-radius: 8px; cursor: pointer; font-size: 13px; transition: all 0.2s;
+    color: var(--muted); background: var(--bg2);
+  }
+  .toggle-label.selected {
+    border-color: var(--highlight); background: var(--card2);
+    color: var(--text); font-weight: 700;
+  }
+  .toggle-label input { display: none; }
+
+  /* 保存ボタン */
+  .submit-btn {
+    background: var(--card2); color: var(--text); border: 1px solid var(--border2);
+    padding: 15px; border-radius: 12px; font-family: inherit;
+    font-size: 16px; font-weight: 700; width: 100%; cursor: pointer;
+    letter-spacing: 0.08em; margin-top: 8px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4); transition: all 0.2s;
+    position: relative; overflow: hidden;
+  }
+  .submit-btn::before {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.06) 0%, transparent 60%);
+    pointer-events: none;
+  }
+  .submit-btn:hover { background: var(--accent2); border-color: var(--highlight); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,0,0,0.5); }
+  .submit-btn:active { transform: translateY(0); }
+
+  /* トースト */
+  .toast {
+    position: fixed; bottom: 28px; left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--card2); color: var(--text);
+    border: 1px solid var(--border2);
+    padding: 12px 24px; border-radius: 50px;
+    font-size: 13px; font-weight: 700; z-index: 999;
+    transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    white-space: nowrap; box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    letter-spacing: 0.03em;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* 一覧 */
+  .filter-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .filter-row input, .filter-row select {
+    padding: 10px 13px; border: 1px solid var(--border);
+    border-radius: 8px; font-family: inherit; font-size: 13px;
+    background: var(--card); color: var(--text); -webkit-appearance: none;
+  }
+  .filter-row input:focus, .filter-row select:focus { outline: none; border-color: var(--highlight); }
+
+  .report-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    margin-bottom: 10px; overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+    cursor: pointer; transition: all 0.2s;
+  }
+  .report-card:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.4); border-color: var(--border2); transform: translateY(-1px); }
+  .report-card-header {
+    background: var(--card2); padding: 10px 16px;
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid var(--border);
+  }
+  .report-card-date { font-weight: 700; font-size: 14px; color: var(--text); letter-spacing: 0.03em; }
+  .report-card-site { font-size: 12px; color: var(--muted); }
+  .report-card-body { padding: 10px 16px; font-size: 13px; }
+  .report-card-meta { display: flex; gap: 14px; flex-wrap: wrap; color: var(--muted2); font-size: 12px; }
+  .report-card-meta span strong { color: var(--text2); }
+  .delete-report-btn { background: none; border: none; color: var(--muted2); font-size: 16px; cursor: pointer; padding: 4px; transition: color 0.2s; }
+  .delete-report-btn:hover { color: var(--danger); }
+  .empty-state { text-align: center; padding: 50px 20px; color: var(--muted2); }
+  .empty-state .icon { font-size: 44px; margin-bottom: 14px; opacity: 0.5; }
+
+  /* モーダル */
+  .modal-overlay {
+    display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.7); z-index: 200; overflow-y: auto; padding: 20px;
+    backdrop-filter: blur(4px);
+  }
+  .modal-overlay.show { display: flex; align-items: flex-start; justify-content: center; }
+  .modal-box {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 16px; max-width: 560px; width: 100%; margin: auto; overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+  }
+  .modal-header {
+    background: var(--card2); color: var(--text);
+    padding: 16px 18px; display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid var(--border);
+  }
+  .modal-header h3 { font-size: 15px; font-weight: 700; }
+  .modal-close { background: none; border: none; color: var(--muted); font-size: 22px; cursor: pointer; transition: color 0.2s; }
+  .modal-close:hover { color: var(--text); }
+  .modal-content { padding: 18px; }
+  .detail-row { display: flex; gap: 8px; margin-bottom: 10px; font-size: 13px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+  .detail-label { font-weight: 700; color: var(--muted); min-width: 90px; font-size: 11px; flex-shrink: 0; letter-spacing: 0.05em; text-transform: uppercase; }
+  .detail-value { color: var(--text2); flex: 1; }
+  .worker-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .worker-chip {
+    background: var(--card2); border: 1px solid var(--border);
+    border-radius: 20px; padding: 3px 10px; font-size: 12px; color: var(--text2);
+  }
+
+  /* 設定 */
+  .tag-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; min-height: 30px; }
+  .tag-item {
+    display: flex; align-items: center; gap: 5px;
+    background: var(--card2); border: 1px solid var(--border);
+    border-radius: 20px; padding: 4px 12px; font-size: 13px; color: var(--text2);
+  }
+  .tag-item button { background: none; border: none; color: var(--muted2); cursor: pointer; font-size: 14px; line-height: 1; padding: 0; transition: color 0.2s; }
+  .tag-item button:hover { color: var(--danger); }
+  .add-tag-row { display: flex; gap: 8px; }
+  .add-tag-row input {
+    flex: 1; padding: 9px 12px; border: 1px solid var(--border);
+    border-radius: 8px; font-family: inherit; font-size: 13px;
+    background: var(--bg2); color: var(--text);
+  }
+  .add-tag-row input:focus { outline: none; border-color: var(--highlight); }
+  .add-tag-row button {
+    background: var(--card2); color: var(--text); border: 1px solid var(--border2);
+    padding: 9px 16px; border-radius: 8px; font-family: inherit;
+    font-size: 13px; cursor: pointer; font-weight: 700; white-space: nowrap; transition: all 0.2s;
+  }
+  .add-tag-row button:hover { border-color: var(--highlight); }
+
+  /* ETC設定 */
+  .etc-master-item {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 9px;
+    padding: 9px 14px; margin-bottom: 6px; font-size: 13px; color: var(--text2);
+  }
+  .etc-master-item .etc-route-text { flex: 1; }
+  .etc-master-item .etc-price { font-weight: 700; color: var(--text); margin: 0 12px; }
+  .etc-card-item {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--bg2); border: 1px solid var(--border); border-radius: 9px;
+    padding: 9px 14px; margin-bottom: 6px; font-size: 13px; color: var(--text2);
+  }
+
+  .etc-add-form {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px; margin-bottom: 10px;
+  }
+  .etc-add-form input {
+    padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px;
+    font-family: inherit; font-size: 13px; background: var(--card2);
+    color: var(--text); -webkit-appearance: none; width: 100%;
+  }
+  .etc-add-form input:focus { outline: none; border-color: var(--highlight); }
+
+  .danger-btn {
+    background: none; border: 1px solid rgba(255,69,58,0.4); color: var(--danger);
+    padding: 10px 18px; border-radius: 8px; font-family: inherit;
+    font-size: 13px; cursor: pointer; font-weight: 700; transition: all 0.2s;
+  }
+  .danger-btn:hover { background: rgba(255,69,58,0.1); border-color: var(--danger); }
+
+  .section-divider { height: 1px; background: var(--border); margin: 14px 0; }
+
+  /* バリデーションエラー */
+  .form-row.error > label:first-child { color: var(--danger); }
+  .form-row.error select,
+  .form-row.error input[type="text"],
+  .form-row.error input[type="date"],
+  .form-row.error textarea {
+    border-color: var(--danger) !important;
+    box-shadow: 0 0 0 2px rgba(255,69,58,0.15) !important;
+  }
+  .form-row.error .radio-label { border-color: var(--danger); }
+  .form-row.error .toggle-label { border-color: var(--danger); }
+  .err-msg { font-size: 11px; color: var(--danger); margin-top: 5px; display: none; }
+  .form-row.error .err-msg { display: block; }
+
+  /* 使用無し */
+  .none-check-label {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 12px; color: var(--muted2); cursor: pointer;
+  }
+  .none-check-label input[type="checkbox"] { accent-color: var(--highlight); width: 15px; height: 15px; }
+  .equip-disabled { opacity: 0.35; pointer-events: none; }
+
+  /* 集計 */
+  .summary-stats {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 10px; margin-bottom: 12px;
+  }
+  .stat-card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 14px; padding: 16px 10px; text-align: center;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+  }
+  .stat-value { font-size: 20px; font-weight: 700; color: var(--text); letter-spacing: 0.02em; }
+  .stat-label { font-size: 10px; color: var(--muted); margin-top: 4px; letter-spacing: 0.08em; text-transform: uppercase; }
+  .summary-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 0; border-bottom: 1px solid var(--border);
+  }
+  .summary-row:last-child { border-bottom: none; }
+  .summary-row-name { flex: 1; font-size: 13px; color: var(--text2); }
+  .summary-row-val { font-size: 13px; font-weight: 700; color: var(--text); min-width: 36px; text-align: right; }
+  .summary-bar-wrap { width: 80px; height: 5px; background: var(--border); border-radius: 3px; flex-shrink: 0; }
+  .summary-bar-fill { height: 5px; background: var(--highlight); border-radius: 3px; transition: width 0.4s; }
+
+  /* ローディング */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #loading-overlay {
+    position: fixed; inset: 0; background: var(--bg); z-index: 9999;
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 16px;
+  }
+  .loading-spinner {
+    width: 40px; height: 40px; border-radius: 50%;
+    border: 3px solid var(--border); border-top-color: var(--highlight);
+    animation: spin 0.8s linear infinite;
+  }
+  .loading-text { font-size: 13px; color: var(--muted); }
+
+  /* インライン入力 */
+  .inline-input-wrap {
+    display: flex; flex-direction: column; gap: 8px;
+    margin-top: 8px; width: 100%;
+  }
+  .inline-input-wrap input {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--highlight);
+    border-radius: 8px; font-family: inherit; font-size: 14px;
+    background: var(--card2); color: var(--text);
+  }
+  .inline-input-wrap input:focus { outline: none; box-shadow: 0 0 0 3px rgba(174,174,178,0.2); }
+  .inline-btn-row { display: flex; gap: 8px; }
+  .inline-add-btn {
+    flex: 1; background: var(--card2); color: var(--text);
+    border: 1px solid var(--highlight);
+    padding: 10px; border-radius: 8px; font-family: inherit;
+    font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s;
+  }
+  .inline-add-btn:hover { background: var(--accent2); }
+  .inline-cancel-btn {
+    flex: 1; background: none; color: var(--muted2);
+    border: 1px solid var(--border);
+    padding: 10px; border-radius: 8px; font-family: inherit;
+    font-size: 14px; cursor: pointer; transition: all 0.2s;
+  }
+  .inline-cancel-btn:hover { border-color: var(--border2); color: var(--text); }
+</style>
+</head>
+<body>
+
+<div id="loading-overlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text">データを読み込み中...</div>
+</div>
+
+<div class="top-bar">
+<div class="app-header">
+  <div>
+    <div class="app-header-title">作 業 日 報</div>
+    <div class="app-header-sub">LAND PROS</div>
+  </div>
+  <div class="header-logo">LAND PROS</div>
+</div>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('input',this)">📝 入力</button>
+  <button class="tab-btn" onclick="switchTab('list',this)">📋 一覧</button>
+  <button class="tab-btn" onclick="switchTab('summary',this)">📊 集計</button>
+  <button class="tab-btn" onclick="switchTab('settings',this)">⚙️ 設定</button>
+</div>
+</div><!-- /top-bar -->
+
+<div class="content">
+
+  <!-- ===== 入力 ===== -->
+  <div id="page-input" class="page active">
+
+    <div class="card">
+      <div class="card-header">📅 基本情報</div>
+      <div class="card-body">
+        <div class="form-grid-2">
+          <div class="form-row">
+            <label>日付</label>
+            <input type="date" id="f-date">
+          </div>
+          <div class="form-row">
+            <label>天候</label>
+            <select id="f-weather">
+              <option value="">選択</option>
+              <option>晴れ</option><option>曇り</option><option>雨</option>
+              <option>雪</option><option>晴れ/曇り</option><option>曇り/雨</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>開始時間</label>
+            <select id="f-start" onchange="calcHours()"></select>
+          </div>
+          <div class="form-row">
+            <label>終了時間</label>
+            <select id="f-end" onchange="calcHours()"></select>
+          </div>
+        </div>
+        <div class="form-row">
+          <label id="hours-label">実働時間（休憩1時間30分を自動控除）</label>
+          <div class="hours-display" id="hours-display">-- 時間</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">🏗️ 現場情報</div>
+      <div class="card-body">
+        <div class="form-row">
+          <label>元請先名</label>
+          <select id="f-client"><option value="">選択してください</option></select>
+        </div>
+        <div class="form-row">
+          <label>現場名</label>
+          <select id="f-site"><option value="">選択してください</option></select>
+        </div>
+        <div class="form-row">
+          <label>作業内容</label>
+          <div class="radio-group">
+            <label class="radio-label" id="label-gaiko">
+              <input type="radio" name="work-type" value="外構工事" onchange="updateRadio()"> 外構工事
+            </label>
+            <label class="radio-label" id="label-kiso">
+              <input type="radio" name="work-type" value="基礎工事" onchange="updateRadio()"> 基礎工事
+            </label>
+            <label class="radio-label" id="label-other">
+              <input type="radio" name="work-type" value="その他" onchange="updateRadio()"> その他
+            </label>
+          </div>
+        </div>
+        <div class="form-row">
+          <label>作業詳細</label>
+          <textarea id="f-work-detail" placeholder="作業内容を詳しく入力"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">👷 作業員</div>
+      <div class="card-body">
+        <div class="worker-list" id="worker-list"></div>
+        <button class="add-btn" style="margin-top:8px;" onclick="addWorkerRow()">＋ 作業員を追加</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">🚧 使用機材・車輌</div>
+      <div class="card-body">
+
+        <div class="equip-section">
+          <div class="equip-section-label">
+            <span>重機</span>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <label class="none-check-label"><input type="checkbox" id="cb-heavy-none" onchange="toggleEquipNone('heavy-list','btn-heavy-add',this)"> 使用無し</label>
+              <button class="add-btn-small" id="btn-heavy-add" onclick="addEquipRow('heavy-list','heavies')">＋ 追加</button>
+            </div>
+          </div>
+          <div class="equip-list" id="heavy-list"></div>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <div class="equip-section">
+          <div class="equip-section-label">
+            <span>車輌</span>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <label class="none-check-label"><input type="checkbox" id="cb-vehicle-none" onchange="toggleEquipNone('vehicle-list','btn-vehicle-add',this)"> 使用無し</label>
+              <button class="add-btn-small" id="btn-vehicle-add" onclick="addEquipRow('vehicle-list','vehicles')">＋ 追加</button>
+            </div>
+          </div>
+          <div class="equip-list" id="vehicle-list"></div>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <div class="equip-section">
+          <div class="equip-section-label">
+            <span>器具</span>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <label class="none-check-label"><input type="checkbox" id="cb-tools-none" onchange="toggleEquipNone('tools-list','btn-tools-add',this)"> 使用無し</label>
+              <button class="add-btn-small" id="btn-tools-add" onclick="addEquipRow('tools-list','toolsList')">＋ 追加</button>
+            </div>
+          </div>
+          <div class="equip-list" id="tools-list"></div>
+        </div>
+
+        <div class="section-divider"></div>
+
+        <div class="equip-section" style="margin-top:4px;">
+          <div class="equip-section-label">
+            <span>リース品</span>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <label class="none-check-label"><input type="checkbox" id="cb-lease-none" onchange="toggleEquipNone('lease-items','btn-lease-add',this)"> 使用無し</label>
+              <button class="add-btn-small" id="btn-lease-add" onclick="addLease()">＋ 追加</button>
+            </div>
+          </div>
+          <div class="list-items" id="lease-items"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">🛣️ ETCカード</div>
+      <div class="card-body">
+        <label class="none-check-label" style="margin-bottom:12px;">
+          <input type="checkbox" id="cb-etc-none" onchange="toggleEtcNone()"> 使用無し
+        </label>
+        <div id="etc-body">
+        <div class="form-row">
+          <label>ETCカード（会社名・番号）</label>
+          <select id="f-etc-card" onchange="onEtcCardChange()">
+            <option value="">選択してください</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>車両区分</label>
+          <div class="toggle-group">
+            <label class="toggle-label" id="etc-vt-normal"><input type="radio" name="etc-vehicle" value="普通車" onchange="updateEtcVehicle()"> 普通車</label>
+            <label class="toggle-label" id="etc-vt-medium"><input type="radio" name="etc-vehicle" value="中型車" onchange="updateEtcVehicle()"> 中型車</label>
+            <label class="toggle-label" id="etc-vt-large"><input type="radio" name="etc-vehicle" value="大型車" onchange="updateEtcVehicle()"> 大型車</label>
+          </div>
+        </div>
+        <div id="etc-routes"></div>
+        <button class="add-btn" onclick="addEtcRoute()">＋ 区間追加</button>
+        </div><!-- /etc-body -->
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">📦 在庫等伝票の無いもの・紛失したもの</div>
+      <div class="card-body">
+        <div class="list-items" id="slip-items"></div>
+        <button class="add-btn" onclick="addSlip()">＋ 追加</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">🤝 外注依頼</div>
+      <div class="card-body">
+        <div class="form-row" id="row-outsource">
+          <label>外注依頼</label>
+          <div class="toggle-group">
+            <label class="toggle-label" id="out-yes">
+              <input type="radio" name="outsource" value="有" onchange="updateOutsource()"> 有
+            </label>
+            <label class="toggle-label" id="out-no">
+              <input type="radio" name="outsource" value="無" onchange="updateOutsource()"> 無
+            </label>
+          </div>
+          <span class="err-msg">外注依頼の有無を選択してください</span>
+        </div>
+        <div id="outsource-detail" style="margin-top:12px;display:none;">
+          <div class="form-row">
+            <label>外注先</label>
+            <select id="f-outsource-co">
+              <option value="">選択してください</option>
+              <option>船木鉄筋</option><option>中村組</option><option>その他</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>その他の外注先</label>
+            <input type="text" id="f-outsource-other" placeholder="その他の外注先名">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <button class="submit-btn" onclick="saveReport()">✅ 日報を保存する</button>
+    <div style="height:24px;"></div>
+  </div>
+
+  <!-- ===== 一覧 ===== -->
+  <div id="page-list" class="page">
+    <div class="filter-row">
+      <input type="month" id="filter-month" onchange="renderList()">
+      <input type="text" id="filter-site" placeholder="🔍 現場名で絞り込み" oninput="renderList()">
+    </div>
+    <div id="report-list"></div>
+  </div>
+
+  <!-- ===== 集計 ===== -->
+  <div id="page-summary" class="page">
+    <div class="filter-row" style="grid-template-columns:1fr;">
+      <input type="month" id="summary-month" onchange="renderSummary()">
+    </div>
+    <div class="summary-stats">
+      <div class="stat-card">
+        <div class="stat-value" id="s-days">0日</div>
+        <div class="stat-label">稼働日数</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="s-hours">0h</div>
+        <div class="stat-label">総実働時間</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="s-avg">0h</div>
+        <div class="stat-label">平均/日</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">🏗️ 現場別稼働日数</div>
+      <div class="card-body" id="s-site-list"><span style="font-size:12px;color:var(--muted);">データなし</span></div>
+    </div>
+    <div class="card">
+      <div class="card-header">🏢 元請先別稼働日数</div>
+      <div class="card-body" id="s-client-list"><span style="font-size:12px;color:var(--muted);">データなし</span></div>
+    </div>
+    <div class="card">
+      <div class="card-header">👷 作業員別稼働日数</div>
+      <div class="card-body" id="s-worker-list"><span style="font-size:12px;color:var(--muted);">データなし</span></div>
+    </div>
+  </div>
+
+  <!-- ===== 設定 ===== -->
+  <div id="page-settings" class="page">
+
+    <div class="card">
+      <div class="card-header">⏱️ 休憩時間設定</div>
+      <div class="card-body">
+        <div class="form-row">
+          <label>休憩時間（実働時間から自動控除）</label>
+          <select id="f-break-minutes" onchange="saveBreakMinutes(this.value)">
+            <option value="0">なし（0分）</option>
+            <option value="30">30分</option>
+            <option value="45">45分</option>
+            <option value="60">1時間（60分）</option>
+            <option value="75">1時間15分（75分）</option>
+            <option value="90">1時間30分（90分）</option>
+            <option value="120">2時間（120分）</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">🏢 元請先マスタ</div>
+      <div class="card-body">
+        <div class="tag-list" id="client-tags"></div>
+        <div class="add-tag-row">
+          <input type="text" id="new-client" placeholder="元請先名を入力" onkeydown="if(event.key==='Enter')addMaster('clients','new-client')">
+          <button onclick="addMaster('clients','new-client')">追加</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">🏗️ 現場名マスタ</div>
+      <div class="card-body">
+        <div class="tag-list" id="site-tags"></div>
+        <div class="add-tag-row">
+          <input type="text" id="new-site" placeholder="現場名を入力" onkeydown="if(event.key==='Enter')addMaster('sites','new-site')">
+          <button onclick="addMaster('sites','new-site')">追加</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">👷 作業員マスタ</div>
+      <div class="card-body">
+        <div class="tag-list" id="worker-tags"></div>
+        <div class="add-tag-row">
+          <input type="text" id="new-worker" placeholder="作業員名を入力" onkeydown="if(event.key==='Enter')addMaster('workers','new-worker')">
+          <button onclick="addMaster('workers','new-worker')">追加</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">🚜 重機マスタ</div>
+      <div class="card-body">
+        <div class="tag-list" id="heavy-tags"></div>
+        <div class="add-tag-row">
+          <input type="text" id="new-heavy" placeholder="例：バックホウ 0.45" onkeydown="if(event.key==='Enter')addMaster('heavies','new-heavy')">
+          <button onclick="addMaster('heavies','new-heavy')">追加</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">🚛 車輌マスタ</div>
+      <div class="card-body">
+        <div class="tag-list" id="vehicle-tags"></div>
+        <div class="add-tag-row">
+          <input type="text" id="new-vehicle" placeholder="例：4tダンプ" onkeydown="if(event.key==='Enter')addMaster('vehicles','new-vehicle')">
+          <button onclick="addMaster('vehicles','new-vehicle')">追加</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">🔧 器具マスタ</div>
+      <div class="card-body">
+        <div class="tag-list" id="tools-tags"></div>
+        <div class="add-tag-row">
+          <input type="text" id="new-tools" placeholder="例：コンプレッサー" onkeydown="if(event.key==='Enter')addMaster('toolsList','new-tools')">
+          <button onclick="addMaster('toolsList','new-tools')">追加</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">📦 リース品マスタ</div>
+      <div class="card-body">
+        <div class="tag-list" id="lease-tags"></div>
+        <div class="add-tag-row">
+          <input type="text" id="new-lease" placeholder="例：発電機、足場材" onkeydown="if(event.key==='Enter')addMaster('leases','new-lease')">
+          <button onclick="addMaster('leases','new-lease')">追加</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">📋 在庫品マスタ</div>
+      <div class="card-body">
+        <div class="tag-list" id="slip-tags"></div>
+        <div class="add-tag-row">
+          <input type="text" id="new-slip" placeholder="例：砂利、型枠、残材" onkeydown="if(event.key==='Enter')addMaster('slipItems','new-slip')">
+          <button onclick="addMaster('slipItems','new-slip')">追加</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ETCカードマスタ -->
+    <div class="card">
+      <div class="card-header">💳 ETCカードマスタ</div>
+      <div class="card-body">
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px;">会社名と番号を登録します</p>
+        <div id="etc-card-list" style="margin-bottom:10px;"></div>
+        <div class="etc-add-form">
+          <div class="form-grid-2" style="gap:8px;margin-bottom:8px;">
+            <input type="text" id="new-etc-company" placeholder="会社名">
+            <input type="text" id="new-etc-num" placeholder="番号">
+          </div>
+          <button class="add-btn" onclick="addEtcCard()">＋ ETCカードを追加</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ETC区間マスタ -->
+    <div class="card">
+      <div class="card-header">🛣️ ETC区間・料金マスタ</div>
+      <div class="card-body">
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px;">出発地・到着地・料金を登録すると、入力時に自動で金額が入ります</p>
+        <div id="etc-route-master-list" style="margin-bottom:10px;"></div>
+        <div class="etc-add-form">
+          <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px;">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:12px;color:var(--muted);min-width:46px;">出発地</span>
+              <input type="text" id="new-etc-from" placeholder="例：中津川IC"
+                style="flex:1;padding:8px 10px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:14px;background:var(--bg2);">
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:12px;color:var(--muted);min-width:46px;">到着地</span>
+              <input type="text" id="new-etc-to" placeholder="例：多治見IC"
+                style="flex:1;padding:8px 10px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:14px;background:var(--bg2);">
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:12px;color:var(--muted);min-width:46px;">普通車</span>
+              <input type="number" id="new-etc-price-normal" placeholder="例：1230"
+                style="flex:1;padding:8px 10px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:14px;background:var(--bg2);">
+              <span style="font-size:13px;color:var(--muted);">円</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:12px;color:var(--muted);min-width:46px;">中型車</span>
+              <input type="number" id="new-etc-price-medium" placeholder="例：1540"
+                style="flex:1;padding:8px 10px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:14px;background:var(--bg2);">
+              <span style="font-size:13px;color:var(--muted);">円</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span style="font-size:12px;color:var(--muted);min-width:46px;">大型車</span>
+              <input type="number" id="new-etc-price-large" placeholder="例：2470"
+                style="flex:1;padding:8px 10px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:14px;background:var(--bg2);">
+              <span style="font-size:13px;color:var(--muted);">円</span>
+            </div>
+          </div>
+          <button class="add-btn" onclick="addEtcRouteMaster()">＋ 区間を追加</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">🗑️ データ管理</div>
+      <div class="card-body">
+        <p style="font-size:13px;color:var(--muted);margin-bottom:12px;">全ての日報データを削除します。この操作は元に戻せません。</p>
+        <button class="danger-btn" onclick="clearAllData()">すべての日報を削除</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- モーダル -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="modal-title">日報詳細</h3>
+      <button class="modal-close" onclick="closeModalDirect()">×</button>
+    </div>
+    <div class="modal-content" id="modal-content"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<datalist id="list-heavies"></datalist>
+<datalist id="list-vehicles"></datalist>
+<datalist id="list-toolsList"></datalist>
+<datalist id="list-etc-places"></datalist>
+
+<script>
+const $ = id => document.getElementById(id);
+
+// ===== Firebase設定（ここにご自身のconfigを貼り付けてください） =====
+const firebaseConfig = {
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId:             "YOUR_APP_ID"
+};
+firebase.initializeApp(firebaseConfig);
+const fsdb = firebase.firestore();
+
+// ===== ストレージ（メモリキャッシュ ＋ Firestore同期） =====
+const _cache = {};
+
+function getData(key, def) {
+  return _cache.hasOwnProperty(key) ? _cache[key] : def;
+}
+
+function setData(key, val) {
+  _cache[key] = val;
+  if (key !== 'reports') {
+    fsdb.doc('appData/main').set({ [key]: val }, { merge: true })
+      .catch(e => console.error('[FS] setData:', key, e));
+  }
+}
+
+// ===== 起動：Firestoreからデータ読み込み後にUIを初期化 =====
+async function initApp() {
+  try {
+    const mainSnap = await fsdb.doc('appData/main').get();
+    if (mainSnap.exists) Object.assign(_cache, mainSnap.data());
+
+    const repSnap = await fsdb.collection('reports').get();
+    _cache.reports = repSnap.docs.map(d => d.data());
+    _cache.reports.sort((a, b) =>
+      b.date > a.date ? -1 : b.date < a.date ? 1 : b.id - a.id
+    );
+  } catch (e) {
+    console.error('[FS] initApp:', e);
+    showToast('⚠️ データの読み込みに失敗しました', true);
+  }
+  $('loading-overlay').style.display = 'none';
+  initPage();
+}
+
+const DEFAULT_CLIENTS = ['大東建託','トーエネック','エミオーク','岐阜県','中津川市','ニュートラル','大和ハウス','鹿島道路','長野日設'];
+
+function getMaster(key) {
+  return getData(key, key === 'clients' ? DEFAULT_CLIENTS : []);
+}
+
+// ===== タブ =====
+function switchTab(tab, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  $('page-' + tab).classList.add('active');
+  btn.classList.add('active');
+  if (tab === 'list') renderList();
+  if (tab === 'settings') renderSettings();
+  if (tab === 'summary') renderSummary();
+}
+
+// ===== 初期化 =====
+function initPage() {
+  $('f-date').value = new Date().toISOString().split('T')[0];
+  $('filter-month').value = new Date().toISOString().slice(0,7);
+  $('summary-month').value = new Date().toISOString().slice(0,7);
+  buildTimeSelects();
+  refreshAllSelects();
+  initWorkerList();
+  initEquipLists();
+  initLeaseItems();
+  initSlipItems();
+  initEtcRoutes();
+}
+
+window.onload = () => initApp();
+
+// ===== 時間セレクト生成（15分刻み） =====
+function buildTimeSelects() {
+  const startSel = $('f-start');
+  const endSel   = $('f-end');
+  startSel.innerHTML = '';
+  endSel.innerHTML   = '';
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m += 15) {
+      const hh = String(h).padStart(2,'0');
+      const mm = String(m).padStart(2,'0');
+      const val = `${hh}:${mm}`;
+      const label = `${hh}:${mm}`;
+      startSel.innerHTML += `<option value="${val}">${label}</option>`;
+      endSel.innerHTML   += `<option value="${val}">${label}</option>`;
+    }
+  }
+  startSel.value = '08:00';
+  endSel.value   = '17:30';
+  calcHours();
+}
+
+// ===== 休憩時間 =====
+function getBreakMinutes() { return getData('breakMinutes', 90); }
+
+function saveBreakMinutes(val) {
+  setData('breakMinutes', parseInt(val));
+  calcHours();
+  showToast('休憩時間を保存しました');
+}
+
+function breakLabel(mins) {
+  if (mins === 0) return 'なし';
+  if (mins < 60) return `${mins}分`;
+  if (mins % 60 === 0) return `${mins/60}時間`;
+  return `${Math.floor(mins/60)}時間${mins%60}分`;
+}
+
+// ===== 実働時間計算 =====
+function calcHours() {
+  const breakMins = getBreakMinutes();
+  const lbl = $('hours-label');
+  if (lbl) lbl.textContent = `実働時間（休憩${breakLabel(breakMins)}を自動控除）`;
+  const s = $('f-start').value;
+  const e = $('f-end').value;
+  if (!s || !e) { $('hours-display').textContent = '-- 時間'; return; }
+  const [sh,sm] = s.split(':').map(Number);
+  const [eh,em] = e.split(':').map(Number);
+  let mins = (eh*60+em) - (sh*60+sm) - breakMins;
+  if (mins <= 0) { $('hours-display').textContent = '計算できません'; return; }
+  const hours = Math.floor(mins / 60);
+  const rem   = mins % 60;
+  $('hours-display').textContent = rem === 0 ? `${hours} 時間` : `${hours} 時間 ${rem} 分`;
+}
+
+// ===== datalist/プルダウン更新 =====
+function refreshAllSelects() {
+  fillSelectEl('f-client', 'clients', '選択してください');
+  fillSelectEl('f-site',   'sites',   '選択してください');
+  document.querySelectorAll('.equip-item select[data-key="heavies"]').forEach(s => refillEquipSelect(s,'heavies'));
+  document.querySelectorAll('.equip-item select[data-key="vehicles"]').forEach(s => refillEquipSelect(s,'vehicles'));
+  document.querySelectorAll('.equip-item select[data-key="toolsList"]').forEach(s => refillEquipSelect(s,'toolsList'));
+  document.querySelectorAll('.equip-item select[data-key="leases"]').forEach(s => refillEquipSelect(s,'leases'));
+  document.querySelectorAll('#slip-items select[data-key="slipItems"]').forEach(s => refillEquipSelect(s,'slipItems'));
+  document.querySelectorAll('#worker-list .worker-item select').forEach(s => fillWorkerSelect(s));
+  fillEtcCardSelect();
+  fillEtcPlaceDatalist();
+}
+
+function fillSelectEl(id, key, placeholder) {
+  const sel = $(id);
+  if (!sel) return;
+  const cur = sel.value;
+  const list = getMaster(key);
+  sel.innerHTML = '<option value="">' + placeholder + '</option>';
+  list.forEach(item => {
+    const opt = document.createElement('option');
+    opt.value = item; opt.textContent = item;
+    if (item === cur) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  const addOpt = document.createElement('option');
+  addOpt.value = '__add__'; addOpt.textContent = '＋ 直接入力して追加';
+  sel.appendChild(addOpt);
+  sel.onchange = (e) => {
+    if (e.target.value === '__add__') showInlineInput(id, key);
+  };
+}
+
+function fillDatalist(dlId, key) {
+  let dl = $(dlId);
+  if (!dl) { dl = document.createElement('datalist'); dl.id = dlId; document.body.appendChild(dl); }
+  const list = getMaster(key);
+  dl.innerHTML = '';
+  list.forEach(item => { const opt = document.createElement('option'); opt.value = item; dl.appendChild(opt); });
+}
+
+function fillWorkerSelect(sel) {
+  const cur = sel.value;
+  const list = getMaster('workers');
+  sel.innerHTML = '<option value="">-- 作業員を選択 --</option>';
+  list.forEach(w => {
+    const opt = document.createElement('option');
+    opt.value = w; opt.textContent = w;
+    if (w === cur) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  const addOpt = document.createElement('option');
+  addOpt.value = '__add__'; addOpt.textContent = '＋ 直接入力して追加';
+  sel.appendChild(addOpt);
+  sel.onchange = (e) => {
+    if (e.target.value === '__add__') showInlineInputForSel(sel, 'workers');
+    else checkWorkerDuplicate(sel);
+  };
+}
+
+function fillEtcRouteSelect(sel) {
+  const cur = sel.value;
+  const routes = getData('etcRoutes', []);
+  sel.innerHTML = '<option value="">選択</option>';
+  const places = [...new Set(routes.flatMap(r => [r.from, r.to]))].filter(Boolean);
+  places.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p; opt.textContent = p;
+    if (p === cur) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  const addOpt = document.createElement('option');
+  addOpt.value = '__add__'; addOpt.textContent = '＋ 直接入力して追加';
+  sel.appendChild(addOpt);
+  sel.onchange = (e) => {
+    if (e.target.value === '__add__') showInlineInputForSel(sel, '__etcplace__');
+    else onEtcRouteChange(sel.closest('.etc-route-item'));
+  };
+}
+
+// ETC地名datalist
+function fillEtcPlaceDatalist() {
+  let dl = $('list-etc-places');
+  if (!dl) { dl = document.createElement('datalist'); dl.id = 'list-etc-places'; document.body.appendChild(dl); }
+  const routes = getData('etcRoutes', []);
+  const places = [...new Set(routes.flatMap(r => [r.from, r.to]))].filter(Boolean);
+  dl.innerHTML = '';
+  places.forEach(p => { const opt = document.createElement('option'); opt.value = p; dl.appendChild(opt); });
+}
+
+function refillEquip() {} // 互換用
+
+function refillEquipSelect(sel, key) {
+  const cur = sel.value;
+  const list = getMaster(key);
+  sel.innerHTML = '<option value="">-- 選択 --</option>';
+  list.forEach(item => {
+    const opt = document.createElement('option');
+    opt.value = item; opt.textContent = item;
+    if (item === cur) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  const addOpt = document.createElement('option');
+  addOpt.value = '__add__'; addOpt.textContent = '＋ 直接入力して追加';
+  sel.appendChild(addOpt);
+  sel.onchange = (e) => {
+    if (e.target.value === '__add__') showInlineInputForSel(sel, key);
+  };
+}
+
+// ===== ETCカードプルダウン =====
+function fillEtcCardSelect() {
+  const sel = $('f-etc-card');
+  if (!sel) return;
+  const cur = sel.value;
+  const cards = getData('etcCards', []);
+  sel.innerHTML = '<option value="">選択してください</option>';
+  cards.forEach((c, i) => {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = `${c.company}（${c.num}）`;
+    if (String(i) === cur) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+function onEtcCardChange() { /* 選択時の処理（将来拡張用） */ }
+
+// ===== ETC区間プルダウン =====
+function fillEtcRouteSelect(sel) {
+  const cur = sel.value;
+  const routes = getData('etcRoutes', []);
+  sel.innerHTML = '<option value="">選択</option>';
+  // 出発地・到着地の一覧（重複除外）
+  const places = [...new Set(routes.flatMap(r => [r.from, r.to]))].filter(Boolean);
+  places.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p; opt.textContent = p;
+    if (p === cur) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+
+function getEtcVehicleType() {
+  return document.querySelector('input[name="etc-vehicle"]:checked')?.value || '普通車';
+}
+
+function updateEtcVehicle() {
+  const vt = getEtcVehicleType();
+  [['etc-vt-normal','普通車'],['etc-vt-medium','中型車'],['etc-vt-large','大型車']].forEach(([id, val]) => {
+    $(id)?.classList.toggle('selected', vt === val);
+  });
+  document.querySelectorAll('#etc-routes .etc-route-item').forEach(row => onEtcRouteChange(row));
+}
+
+function onEtcRouteChange(row) {
+  const fromSel = row.querySelector('.etc-from-sel');
+  const toSel   = row.querySelector('.etc-to-sel');
+  const amtInp  = row.querySelector('.etc-amt-inp');
+  const badge   = row.querySelector('.etc-auto-badge');
+  const from = fromSel.value;
+  const to   = toSel.value;
+  if (!from || !to) return;
+  const vt = getEtcVehicleType();
+  const routes = getData('etcRoutes', []);
+  const matched = routes.find(r => r.from === from && r.to === to);
+  if (matched) {
+    const price = matched.prices?.[vt] ?? (vt === '普通車' ? matched.price : null);
+    if (price != null) {
+      amtInp.value = price;
+      if (badge) badge.style.display = 'inline';
+    } else {
+      if (badge) badge.style.display = 'none';
+    }
+  } else {
+    if (badge) badge.style.display = 'none';
+  }
+}
+
+function autoSaveEtcRoute(from, to, vehicleType, amount) {
+  const price = parseInt(amount);
+  if (!from || !to || isNaN(price)) return;
+  const routes = getData('etcRoutes', []);
+  const idx = routes.findIndex(r => r.from === from && r.to === to);
+  if (idx >= 0) {
+    if (!routes[idx].prices) routes[idx].prices = {};
+    routes[idx].prices[vehicleType] = price;
+    if (vehicleType === '普通車') routes[idx].price = price;
+  } else {
+    const newRoute = { from, to, price: vehicleType === '普通車' ? price : 0, prices: { [vehicleType]: price } };
+    routes.push(newRoute);
+  }
+  setData('etcRoutes', routes);
+  fillEtcPlaceDatalist();
+}
+
+// ===== マスタ管理 =====
+const KEY_TAG_MAP = {
+  clients:'client-tags', sites:'site-tags', workers:'worker-tags',
+  heavies:'heavy-tags', vehicles:'vehicle-tags', toolsList:'tools-tags',
+  leases:'lease-tags', slipItems:'slip-tags'
+};
+
+function addMaster(key, inputId) {
+  const inp = $(inputId);
+  const val = inp.value.trim();
+  if (!val) return;
+  const list = getMaster(key);
+  if (!list.includes(val)) { list.push(val); setData(key, list); }
+  inp.value = '';
+  renderTagList(key);
+  refreshAllSelects();
+  showToast('追加しました');
+}
+
+function removeMasterItem(key, idx) {
+  const list = getMaster(key);
+  list.splice(idx, 1);
+  setData(key, list);
+  renderTagList(key);
+  refreshAllSelects();
+}
+
+function renderTagList(key) {
+  const tagId = KEY_TAG_MAP[key];
+  const cont = $(tagId);
+  if (!cont) return;
+  const list = getMaster(key);
+  cont.innerHTML = '';
+  if (!list.length) { cont.innerHTML = '<span style="font-size:12px;color:var(--muted);">未登録</span>'; return; }
+  list.forEach((item, i) => {
+    const tag = document.createElement('div');
+    tag.className = 'tag-item';
+    const span = document.createElement('span'); span.textContent = item;
+    const btn = document.createElement('button'); btn.textContent = '×';
+    btn.onclick = () => removeMasterItem(key, i);
+    tag.appendChild(span); tag.appendChild(btn);
+    cont.appendChild(tag);
+  });
+}
+
+// ETCカードマスタ
+function addEtcCard() {
+  const company = $('new-etc-company').value.trim();
+  const num     = $('new-etc-num').value.trim();
+  if (!company || !num) { showToast('⚠️ 会社名と番号を入力してください', true); return; }
+  const cards = getData('etcCards', []);
+  cards.push({ company, num });
+  setData('etcCards', cards);
+  $('new-etc-company').value = '';
+  $('new-etc-num').value = '';
+  renderEtcCardMaster();
+  fillEtcCardSelect();
+  showToast('ETCカードを追加しました');
+}
+
+function removeEtcCard(idx) {
+  const cards = getData('etcCards', []);
+  cards.splice(idx, 1);
+  setData('etcCards', cards);
+  renderEtcCardMaster();
+  fillEtcCardSelect();
+}
+
+function renderEtcCardMaster() {
+  const cont = $('etc-card-list');
+  if (!cont) return;
+  const cards = getData('etcCards', []);
+  cont.innerHTML = '';
+  if (!cards.length) { cont.innerHTML = '<p style="font-size:12px;color:var(--muted);">未登録</p>'; return; }
+  cards.forEach((c, i) => {
+    const div = document.createElement('div');
+    div.className = 'etc-card-item';
+    div.innerHTML = `<span>${c.company}（${c.num}）</span>`;
+    const btn = document.createElement('button');
+    btn.className = 'item-remove'; btn.textContent = '×';
+    btn.onclick = () => removeEtcCard(i);
+    div.appendChild(btn);
+    cont.appendChild(div);
+  });
+}
+
+// ETC区間マスタ
+function addEtcRouteMaster() {
+  const from  = $('new-etc-from').value.trim();
+  const to    = $('new-etc-to').value.trim();
+  const pN = $('new-etc-price-normal').value.trim();
+  const pM = $('new-etc-price-medium').value.trim();
+  const pL = $('new-etc-price-large').value.trim();
+  if (!from || !to || (!pN && !pM && !pL)) { showToast('⚠️ 出発地・到着地・料金（いずれか）を入力してください', true); return; }
+  const prices = {};
+  if (pN) prices['普通車'] = parseInt(pN);
+  if (pM) prices['中型車'] = parseInt(pM);
+  if (pL) prices['大型車'] = parseInt(pL);
+  const routes = getData('etcRoutes', []);
+  const idx = routes.findIndex(r => r.from === from && r.to === to);
+  if (idx >= 0) {
+    if (!routes[idx].prices) routes[idx].prices = {};
+    Object.assign(routes[idx].prices, prices);
+    if (prices['普通車']) routes[idx].price = prices['普通車'];
+  } else {
+    routes.push({ from, to, price: prices['普通車'] || 0, prices });
+  }
+  setData('etcRoutes', routes);
+  $('new-etc-from').value = '';
+  $('new-etc-to').value = '';
+  $('new-etc-price-normal').value = '';
+  $('new-etc-price-medium').value = '';
+  $('new-etc-price-large').value = '';
+  renderEtcRouteMaster();
+  fillEtcPlaceDatalist();
+  showToast('区間を追加しました');
+}
+
+function removeEtcRouteMaster(idx) {
+  const routes = getData('etcRoutes', []);
+  routes.splice(idx, 1);
+  setData('etcRoutes', routes);
+  renderEtcRouteMaster();
+  fillEtcPlaceDatalist();
+}
+
+function renderEtcRouteMaster() {
+  const cont = $('etc-route-master-list');
+  if (!cont) return;
+  const routes = getData('etcRoutes', []);
+  cont.innerHTML = '';
+  if (!routes.length) { cont.innerHTML = '<p style="font-size:12px;color:var(--muted);">未登録</p>'; return; }
+  routes.forEach((r, i) => {
+    const div = document.createElement('div');
+    div.className = 'etc-master-item';
+    div.style.cssText = 'flex-direction:column;align-items:flex-start;gap:5px;';
+    const topRow = document.createElement('div');
+    topRow.style.cssText = 'display:flex;justify-content:space-between;align-items:center;width:100%;';
+    const txt = document.createElement('span'); txt.className = 'etc-route-text';
+    txt.textContent = `${r.from} → ${r.to}`;
+    const btn = document.createElement('button'); btn.className = 'item-remove'; btn.textContent = '×';
+    btn.onclick = () => removeEtcRouteMaster(i);
+    topRow.appendChild(txt); topRow.appendChild(btn);
+    const priceRow = document.createElement('div');
+    priceRow.style.cssText = 'display:flex;gap:12px;font-size:12px;flex-wrap:wrap;';
+    const pm = r.prices || (r.price ? { '普通車': r.price } : {});
+    ['普通車','中型車','大型車'].forEach(vt => {
+      if (pm[vt] != null) {
+        const sp = document.createElement('span');
+        sp.innerHTML = `<span style="color:var(--muted)">${vt}:</span> <strong style="color:var(--text)">${pm[vt].toLocaleString()}円</strong>`;
+        priceRow.appendChild(sp);
+      }
+    });
+    div.appendChild(topRow);
+    if (priceRow.children.length) div.appendChild(priceRow);
+    cont.appendChild(div);
+  });
+}
+
+function renderSettings() {
+  Object.keys(KEY_TAG_MAP).forEach(key => renderTagList(key));
+  renderEtcCardMaster();
+  renderEtcRouteMaster();
+  const breakSel = $('f-break-minutes');
+  if (breakSel) breakSel.value = getBreakMinutes();
+}
+
+// ===== ラジオ =====
+function updateRadio() {
+  const val = document.querySelector('input[name="work-type"]:checked')?.value;
+  $('label-gaiko').classList.toggle('checked', val === '外構工事');
+  $('label-kiso').classList.toggle('checked', val === '基礎工事');
+  $('label-other').classList.toggle('checked', val === 'その他');
+}
+
+// ===== 外注 =====
+function updateOutsource() {
+  const val = document.querySelector('input[name="outsource"]:checked')?.value;
+  $('out-yes').classList.toggle('selected', val === '有');
+  $('out-no').classList.toggle('selected', val === '無');
+  $('outsource-detail').style.display = val === '有' ? 'block' : 'none';
+}
+
+// ===== 作業員 =====
+function initWorkerList() {
+  $('worker-list').innerHTML = '';
+  for (let i = 0; i < 3; i++) addWorkerRow();
+}
+
+function addWorkerRow() {
+  const cont = $('worker-list');
+  const div = document.createElement('div');
+  div.className = 'worker-item';
+  const sel = document.createElement('select');
+  fillWorkerSelect(sel);
+  const checkLabel = document.createElement('label');
+  checkLabel.className = 'worker-check';
+  const chk = document.createElement('input'); chk.type = 'checkbox';
+  checkLabel.appendChild(chk);
+  checkLabel.appendChild(document.createTextNode('\u00a0確認'));
+  const rmBtn = document.createElement('button');
+  rmBtn.className = 'item-remove'; rmBtn.textContent = '×';
+  rmBtn.onclick = () => {
+    if (cont.querySelectorAll('.worker-item').length > 1) div.remove();
+    else { sel.value = ''; chk.checked = false; }
+  };
+  div.appendChild(sel); div.appendChild(checkLabel); div.appendChild(rmBtn);
+  cont.appendChild(div);
+}
+
+// ===== インライン追加（プルダウン直下に入力欄を表示） =====
+
+// 固定select（f-client, f-site）用
+function showInlineInput(selId, key) {
+  const sel = $(selId);
+  sel.value = '';
+  const wrap = sel.parentElement;
+  // 既存インライン入力があれば削除
+  const existing = wrap.querySelector('.inline-input-wrap');
+  if (existing) existing.remove();
+
+  const div = document.createElement('div');
+  div.className = 'inline-input-wrap';
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.placeholder = '新しい項目を入力';
+  inp.autofocus = true;
+  const addBtn = document.createElement('button');
+  addBtn.className = 'inline-add-btn'; addBtn.textContent = '追加';
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'inline-cancel-btn'; cancelBtn.textContent = 'キャンセル';
+
+  const doAdd = () => {
+    const val = inp.value.trim();
+    if (!val) return;
+    const list = getMaster(key);
+    if (!list.includes(val)) { list.push(val); setData(key, list); }
+    fillSelectEl(selId, key, '選択してください');
+    $(selId).value = val;
+    div.remove();
+    showToast('追加しました');
+  };
+
+  addBtn.onclick = doAdd;
+  cancelBtn.onclick = () => { div.remove(); };
+  inp.onkeydown = (e) => { if (e.key === 'Enter') doAdd(); if (e.key === 'Escape') div.remove(); };
+
+  const btnRow = document.createElement('div');
+  btnRow.className = 'inline-btn-row';
+  btnRow.appendChild(addBtn); btnRow.appendChild(cancelBtn);
+  div.appendChild(inp); div.appendChild(btnRow);
+  wrap.appendChild(div);
+  setTimeout(() => inp.focus(), 50);
+}
+
+// 動的生成selectリ（機材・作業員・ETC地名）用
+function showInlineInputForSel(sel, key) {
+  sel.value = '';
+  const wrap = sel.parentElement;
+  const existing = wrap.querySelector('.inline-input-wrap');
+  if (existing) existing.remove();
+
+  const div = document.createElement('div');
+  div.className = 'inline-input-wrap';
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.placeholder = '新しい項目を入力';
+  const addBtn = document.createElement('button');
+  addBtn.className = 'inline-add-btn'; addBtn.textContent = '追加';
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'inline-cancel-btn'; cancelBtn.textContent = 'キャンセル';
+
+  const doAdd = () => {
+    const val = inp.value.trim();
+    if (!val) return;
+
+    if (key === '__etcplace__') {
+      // ETC地名は保存せず選択肢に追加するだけ（区間マスタには登録しない）
+      const opt = document.createElement('option');
+      opt.value = val; opt.textContent = val;
+      // __add__の前に挿入
+      const addOpt = [...sel.options].find(o => o.value === '__add__');
+      sel.insertBefore(opt, addOpt);
+      sel.value = val;
+    } else {
+      const list = getMaster(key);
+      if (!list.includes(val)) { list.push(val); setData(key, list); }
+      // 全同種selectを更新
+      if (key === 'workers') {
+        document.querySelectorAll('#worker-list .worker-item select').forEach(s => fillWorkerSelect(s));
+        sel.value = val;
+      } else if (['heavies','vehicles','toolsList','leases'].includes(key)) {
+        document.querySelectorAll(`.equip-item select[data-key="${key}"]`).forEach(s => refillEquipSelect(s, key));
+        sel.value = val;
+      } else if (key === 'slipItems') {
+        document.querySelectorAll('#slip-items select[data-key="slipItems"]').forEach(s => refillEquipSelect(s, key));
+        sel.value = val;
+      }
+    }
+    div.remove();
+    showToast('追加しました');
+  };
+
+  addBtn.onclick = doAdd;
+  cancelBtn.onclick = () => { div.remove(); };
+  inp.onkeydown = (e) => { if (e.key === 'Enter') doAdd(); if (e.key === 'Escape') div.remove(); };
+
+  const btnRow2 = document.createElement('div');
+  btnRow2.className = 'inline-btn-row';
+  btnRow2.appendChild(addBtn); btnRow2.appendChild(cancelBtn);
+  div.appendChild(inp); div.appendChild(btnRow2);
+  wrap.appendChild(div);
+  setTimeout(() => inp.focus(), 50);
+}
+
+// 作業員重複チェック
+function checkWorkerDuplicate(changedSel) {
+  const val = changedSel.value;
+  if (!val) return;
+  const allSels = [...document.querySelectorAll('#worker-list .worker-item select')];
+  const duplicates = allSels.filter(s => s !== changedSel && s.value === val);
+  if (duplicates.length > 0) {
+    showToast('⚠️ ' + val + ' はすでに選択されています', true);
+    changedSel.value = '';
+  }
+}
+
+// ===== 機材（複数） =====
+function initEquipLists() {
+  ['heavy-list','vehicle-list','tools-list'].forEach(id => $( id).innerHTML = '');
+  addEquipRow('heavy-list',   'heavies');
+  addEquipRow('vehicle-list', 'vehicles');
+  addEquipRow('tools-list',   'toolsList');
+}
+
+function addEquipRow(contId, key) {
+  const cont = $(contId);
+  const div = document.createElement('div');
+  div.className = 'equip-item';
+  const sel = document.createElement('select');
+  sel.setAttribute('data-key', key);
+  sel.style.cssText = 'flex:1;padding:7px 10px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:13px;background:var(--bg2);color:var(--text);-webkit-appearance:none;';
+  refillEquipSelect(sel, key);
+  const rmBtn = document.createElement('button');
+  rmBtn.className = 'item-remove'; rmBtn.textContent = '×';
+  rmBtn.onclick = () => {
+    if (cont.querySelectorAll('.equip-item').length > 1) div.remove();
+    else sel.value = '';
+  };
+  div.appendChild(sel); div.appendChild(rmBtn);
+  cont.appendChild(div);
+}
+
+// ===== リース =====
+function initLeaseItems() {
+  $('lease-items').innerHTML = '';
+  addLease();
+}
+function addLease() {
+  const cont = $('lease-items');
+  const div = document.createElement('div');
+  div.className = 'equip-item';
+  const sel = document.createElement('select');
+  sel.setAttribute('data-key', 'leases');
+  sel.style.cssText = 'flex:1;padding:7px 10px;border:1px solid var(--border);border-radius:7px;font-family:inherit;font-size:13px;background:var(--card2);color:var(--text);-webkit-appearance:none;';
+  refillEquipSelect(sel, 'leases');
+  const rmBtn = document.createElement('button');
+  rmBtn.className = 'item-remove'; rmBtn.textContent = '×';
+  rmBtn.onclick = () => {
+    if (cont.querySelectorAll('.equip-item').length > 1) div.remove();
+    else sel.value = '';
+  };
+  div.appendChild(sel); div.appendChild(rmBtn);
+  cont.appendChild(div);
+}
+
+// ===== 在庫伝票 =====
+function initSlipItems() {
+  $('slip-items').innerHTML = '';
+  addSlip();
+}
+function addSlip() {
+  const cont = $('slip-items');
+  const div = document.createElement('div'); div.className = 'list-item';
+  const sel = document.createElement('select');
+  sel.className = 'slip-name';
+  sel.setAttribute('data-key', 'slipItems');
+  sel.style.cssText = 'flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;background:var(--bg2);color:var(--text);-webkit-appearance:none;min-width:0;';
+  refillEquipSelect(sel, 'slipItems');
+  const qty = document.createElement('input');
+  qty.type = 'text'; qty.placeholder = '数量'; qty.className = 'slip-qty';
+  qty.style.cssText = 'width:72px;flex-shrink:0;padding:8px 8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;background:var(--bg2);color:var(--text);text-align:center;';
+  const btn = document.createElement('button'); btn.className = 'remove-btn'; btn.textContent = '×';
+  btn.onclick = () => {
+    if (cont.querySelectorAll('.list-item').length > 1) div.remove();
+    else { sel.value = ''; qty.value = ''; }
+  };
+  div.appendChild(sel); div.appendChild(qty); div.appendChild(btn); cont.appendChild(div);
+}
+
+// ===== ETC区間入力 =====
+function initEtcRoutes() {
+  $('etc-routes').innerHTML = '';
+  addEtcRoute();
+}
+
+function addEtcRoute() {
+  const cont = $('etc-routes');
+  const row = document.createElement('div');
+  row.className = 'etc-route-item';
+
+  const topRow = document.createElement('div');
+  topRow.className = 'etc-route-row';
+
+  const inpStyle = 'flex:1;padding:7px 9px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;font-size:13px;background:var(--bg2);color:var(--text);min-width:0;';
+
+  const fromInp = document.createElement('input');
+  fromInp.type = 'text'; fromInp.className = 'etc-from-sel';
+  fromInp.placeholder = '出発地'; fromInp.setAttribute('list', 'list-etc-places');
+  fromInp.style.cssText = inpStyle;
+  fromInp.oninput = () => onEtcRouteChange(row);
+
+  const arrow = document.createElement('span');
+  arrow.className = 'etc-arrow'; arrow.textContent = '→';
+
+  const toInp = document.createElement('input');
+  toInp.type = 'text'; toInp.className = 'etc-to-sel';
+  toInp.placeholder = '到着地'; toInp.setAttribute('list', 'list-etc-places');
+  toInp.style.cssText = inpStyle;
+  toInp.oninput = () => onEtcRouteChange(row);
+
+  const rmBtn = document.createElement('button');
+  rmBtn.className = 'item-remove'; rmBtn.textContent = '×';
+  rmBtn.onclick = () => {
+    if (cont.querySelectorAll('.etc-route-item').length > 1) row.remove();
+    else { fromInp.value = ''; toInp.value = ''; amtInp.value = ''; }
+  };
+
+  topRow.appendChild(fromInp); topRow.appendChild(arrow);
+  topRow.appendChild(toInp); topRow.appendChild(rmBtn);
+
+  const amtRow = document.createElement('div');
+  amtRow.className = 'etc-amount-row';
+  const amtLabel = document.createElement('span'); amtLabel.className = 'etc-amount-label'; amtLabel.textContent = '料金：';
+  const amtInp = document.createElement('input');
+  amtInp.type = 'number'; amtInp.placeholder = '自動入力または手入力';
+  amtInp.className = 'etc-amt-inp';
+  const badge = document.createElement('span'); badge.className = 'etc-auto-badge'; badge.textContent = '自動'; badge.style.display = 'none';
+  const yen = document.createElement('span'); yen.className = 'etc-amount-label'; yen.textContent = '円';
+
+  amtRow.appendChild(amtLabel); amtRow.appendChild(amtInp);
+  amtRow.appendChild(badge); amtRow.appendChild(yen);
+
+  row.appendChild(topRow); row.appendChild(amtRow);
+  cont.appendChild(row);
+}
+
+// ===== 使用無し =====
+function toggleEquipNone(listId, btnId, cb) {
+  const list = $(listId);
+  const btn  = $(btnId);
+  if (cb.checked) {
+    list.classList.add('equip-disabled');
+    if (btn) btn.style.display = 'none';
+  } else {
+    list.classList.remove('equip-disabled');
+    if (btn) btn.style.display = '';
+  }
+}
+
+function toggleEtcNone() {
+  const checked = $('cb-etc-none').checked;
+  $('etc-body').style.display = checked ? 'none' : '';
+}
+
+// ===== バリデーション =====
+function validateForm() {
+  clearErrors();
+  let valid = true;
+  let firstErr = null;
+
+  function markErr(el, msg) {
+    valid = false;
+    const row = el.closest ? el.closest('.form-row') : null;
+    if (row) {
+      row.classList.add('error');
+      let span = row.querySelector('.err-msg');
+      if (!span) {
+        span = document.createElement('span');
+        span.className = 'err-msg';
+        row.appendChild(span);
+      }
+      span.textContent = msg;
+      span.style.display = 'block';
+      if (!firstErr) firstErr = row;
+    }
+  }
+
+  if (!$('f-weather').value)   markErr($('f-weather'),   '天候を選択してください');
+  if (!$('f-client').value)    markErr($('f-client'),    '元請先を選択してください');
+  if (!$('f-site').value)      markErr($('f-site'),      '現場名を選択してください');
+
+  if (!document.querySelector('input[name="work-type"]:checked')) {
+    const el = document.querySelector('.radio-group');
+    if (el) markErr(el, '作業内容を選択してください');
+  }
+
+  const hasWorker = [...document.querySelectorAll('#worker-list .worker-item select')].some(s => s.value);
+  if (!hasWorker) {
+    valid = false;
+    document.querySelectorAll('#worker-list .worker-item select').forEach(s => {
+      s.style.borderColor = 'var(--danger)';
+      s.style.boxShadow   = '0 0 0 2px rgba(255,69,58,0.15)';
+    });
+    let errDiv = document.getElementById('worker-err');
+    if (!errDiv) {
+      errDiv = document.createElement('div');
+      errDiv.id = 'worker-err';
+      errDiv.className = 'err-msg';
+      errDiv.style.cssText = 'display:block;margin-top:6px;';
+      $('worker-list').insertAdjacentElement('afterend', errDiv);
+    }
+    errDiv.textContent = '作業員を1名以上選択してください';
+    if (!firstErr) firstErr = errDiv;
+  }
+
+  if (!document.querySelector('input[name="outsource"]:checked')) {
+    const row = $('row-outsource');
+    if (row) {
+      row.classList.add('error');
+      if (!firstErr) firstErr = row;
+    }
+    valid = false;
+  }
+
+  if (!valid) {
+    showToast('⚠️ 未入力の項目があります', true);
+    if (firstErr) firstErr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  return valid;
+}
+
+function clearErrors() {
+  document.querySelectorAll('.form-row.error').forEach(r => r.classList.remove('error'));
+  document.querySelectorAll('#worker-list .worker-item select').forEach(s => {
+    s.style.borderColor = '';
+    s.style.boxShadow   = '';
+  });
+  const we = document.getElementById('worker-err');
+  if (we) we.remove();
+}
+
+// ===== 保存 =====
+function saveReport() {
+  if (!validateForm()) return;
+
+  const workers = [...document.querySelectorAll('#worker-list .worker-item')].map(item => {
+    const sel = item.querySelector('select');
+    const chk = item.querySelector('input[type="checkbox"]');
+    return sel?.value ? { name: sel.value, checked: chk?.checked || false } : null;
+  }).filter(Boolean);
+
+  const heavies  = $('cb-heavy-none').checked   ? [] : [...document.querySelectorAll('#heavy-list .equip-item select')].map(s=>s.value).filter(Boolean);
+  const vehicles = $('cb-vehicle-none').checked  ? [] : [...document.querySelectorAll('#vehicle-list .equip-item select')].map(s=>s.value).filter(Boolean);
+  const tools    = $('cb-tools-none').checked    ? [] : [...document.querySelectorAll('#tools-list .equip-item select')].map(s=>s.value).filter(Boolean);
+  const leases   = $('cb-lease-none').checked    ? [] : [...document.querySelectorAll('#lease-items .equip-item select')].map(s=>s.value).filter(Boolean);
+  const slips = [...document.querySelectorAll('#slip-items .list-item')].map(div => {
+    const name = div.querySelector('.slip-name')?.value.trim();
+    const qty  = div.querySelector('.slip-qty')?.value.trim();
+    return name ? { name, qty: qty || '' } : null;
+  }).filter(Boolean);
+
+  const etcNone    = $('cb-etc-none').checked;
+  const etcCardIdx = etcNone ? '' : $('f-etc-card').value;
+  const etcCards   = getData('etcCards', []);
+  const etcCard    = etcCardIdx !== '' ? etcCards[parseInt(etcCardIdx)] : null;
+
+  const etcRouteData = etcNone ? [] : [...document.querySelectorAll('#etc-routes .etc-route-item')].map(row => ({
+    from:   row.querySelector('.etc-from-sel')?.value || '',
+    to:     row.querySelector('.etc-to-sel')?.value || '',
+    amount: row.querySelector('.etc-amt-inp')?.value || ''
+  })).filter(x => x.from || x.to || x.amount);
+
+  // 実働時間テキスト取得
+  const hoursText = $('hours-display').textContent;
+
+  const report = {
+    id: Date.now(),
+    date:        $('f-date').value,
+    weather:     $('f-weather').value,
+    timeStart:   $('f-start').value,
+    timeEnd:     $('f-end').value,
+    hoursText,
+    client:      $('f-client').value,
+    site:        $('f-site').value,
+    workType:    document.querySelector('input[name="work-type"]:checked')?.value || '',
+    workDetail:  $('f-work-detail').value,
+    workers, heavies, vehicles, tools, leases, slips,
+    etcCard:     etcCard ? `${etcCard.company}（${etcCard.num}）` : '',
+    etcVehicle:  getEtcVehicleType(),
+    etcRoutes:   etcRouteData,
+    outsource:   document.querySelector('input[name="outsource"]:checked')?.value || '',
+    outsourceCo: $('f-outsource-co').value,
+    outsourceOther: $('f-outsource-other').value,
+    createdAt:   new Date().toISOString()
+  };
+
+  if (!report.date) { showToast('⚠️ 日付を入力してください', true); return; }
+
+  const reports = getData('reports', []);
+  reports.unshift(report);
+  setData('reports', reports);
+  // Firestoreへ保存
+  fsdb.collection('reports').doc(String(report.id)).set(report)
+    .catch(e => console.error('[FS] saveReport:', e));
+  // 入力済みETC区間を自動記憶
+  const vt = report.etcVehicle || '普通車';
+  etcRouteData.forEach(r => { if (r.from && r.to && r.amount) autoSaveEtcRoute(r.from, r.to, vt, r.amount); });
+  showToast('✅ 日報を保存しました！');
+  resetForm();
+}
+
+// ===== リセット =====
+function resetForm() {
+  clearErrors();
+  // 使用無しリセット
+  const equipMap = [
+    ['cb-heavy-none',   'heavy-list',   'btn-heavy-add'],
+    ['cb-vehicle-none', 'vehicle-list', 'btn-vehicle-add'],
+    ['cb-tools-none',   'tools-list',   'btn-tools-add'],
+    ['cb-lease-none',   'lease-items',  'btn-lease-add'],
+  ];
+  equipMap.forEach(([cbId, listId, btnId]) => {
+    const cb = $(cbId);
+    if (cb) { cb.checked = false; }
+    $(listId)?.classList.remove('equip-disabled');
+    const btn = $(btnId);
+    if (btn) btn.style.display = '';
+  });
+  $('cb-etc-none').checked = false;
+  $('etc-body').style.display = '';
+
+  $('f-date').value = new Date().toISOString().split('T')[0];
+  $('f-weather').value = '';
+  $('f-start').value = '08:00';
+  $('f-end').value = '17:30';
+  calcHours();
+  $('f-client').value = '';
+  $('f-site').value = '';
+  // (datalist: input要素なのでそのままclear)
+  $('f-work-detail').value = '';
+  document.querySelectorAll('input[name="work-type"]').forEach(r => r.checked = false);
+  $('label-gaiko').classList.remove('checked');
+  $('label-kiso').classList.remove('checked');
+  $('label-other').classList.remove('checked');
+  document.querySelectorAll('input[name="outsource"]').forEach(r => r.checked = false);
+  $('out-yes').classList.remove('selected');
+  $('out-no').classList.remove('selected');
+  $('outsource-detail').style.display = 'none';
+  $('f-outsource-co').value = '';
+  $('f-outsource-other').value = '';
+  $('f-etc-card').value = '';
+  document.querySelectorAll('input[name="etc-vehicle"]').forEach(r => r.checked = false);
+  ['etc-vt-normal','etc-vt-medium','etc-vt-large'].forEach(id => $(id)?.classList.remove('selected'));
+  initWorkerList();
+  initEquipLists();
+  initLeaseItems();
+  initSlipItems();
+  initEtcRoutes();
+}
+
+// ===== 一覧 =====
+function renderList() {
+  const month = $('filter-month').value;
+  const site  = $('filter-site').value.trim();
+  let reports = getData('reports', []);
+  if (month) reports = reports.filter(r => r.date?.startsWith(month));
+  if (site)  reports = reports.filter(r => r.site?.includes(site));
+
+  const cont = $('report-list');
+  if (!reports.length) {
+    cont.innerHTML = '<div class="empty-state"><div class="icon">📋</div><div>日報がありません</div></div>';
+    return;
+  }
+  const wmap = {晴れ:'☀️',曇り:'☁️',雨:'🌧️',雪:'❄️'};
+  cont.innerHTML = '';
+  reports.forEach(r => {
+    const card = document.createElement('div'); card.className = 'report-card';
+    const wIcon = wmap[r.weather] || '';
+    card.innerHTML = `
+      <div class="report-card-header">
+        <span class="report-card-date">${r.date} ${wIcon} ${r.weather||''}</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="report-card-site">${r.site||'現場名未入力'}</span>
+          <button class="delete-report-btn" onclick="deleteReport(${r.id},event)">🗑️</button>
+        </div>
+      </div>
+      <div class="report-card-body">
+        <div class="report-card-meta">
+          <span>🏢 <strong>${r.client||'-'}</strong></span>
+          <span>🔨 <strong>${r.workType||'-'}</strong></span>
+          <span>⏱️ <strong>${r.hoursText||'-'}</strong></span>
+          <span>👷 <strong>${(r.workers||[]).length}名</strong></span>
+        </div>
+        ${r.workDetail?`<div style="margin-top:8px;font-size:12px;color:var(--muted);">${r.workDetail.slice(0,60)}${r.workDetail.length>60?'…':''}</div>`:''}
+      </div>`;
+    card.querySelector('.report-card-header').addEventListener('click', () => showDetail(r));
+    card.querySelector('.report-card-body').addEventListener('click', () => showDetail(r));
+    cont.appendChild(card);
+  });
+}
+
+function deleteReport(id, e) {
+  e.stopPropagation();
+  if (!confirm('この日報を削除しますか？')) return;
+  setData('reports', getData('reports',[]).filter(r => r.id !== id));
+  fsdb.collection('reports').doc(String(id)).delete()
+    .catch(e => console.error('[FS] deleteReport:', e));
+  renderList();
+  showToast('削除しました');
+}
+
+// ===== 詳細モーダル =====
+function showDetail(r) {
+  $('modal-title').textContent = `日報詳細 - ${r.date}`;
+  const chips = (r.workers||[]).map(w=>`<span class="worker-chip">${w.name}${w.checked?' ✓':''}</span>`).join('');
+  const etcText = (r.etcRoutes||[]).filter(x=>x.from||x.to)
+    .map(x=>`${x.from||'?'} → ${x.to||'?'}${x.amount?' '+parseInt(x.amount).toLocaleString()+'円':''}`).join('<br>');
+  $('modal-content').innerHTML = `
+    <div class="detail-row"><div class="detail-label">日付</div><div class="detail-value">${r.date} ${r.weather||''}</div></div>
+    <div class="detail-row"><div class="detail-label">勤務時間</div><div class="detail-value">${r.timeStart||''}${r.timeEnd?' ～ '+r.timeEnd:''} （${r.hoursText||'-'}）</div></div>
+    <div class="detail-row"><div class="detail-label">元請先</div><div class="detail-value">${r.client||'-'}</div></div>
+    <div class="detail-row"><div class="detail-label">現場名</div><div class="detail-value">${r.site||'-'}</div></div>
+    <div class="detail-row"><div class="detail-label">作業内容</div><div class="detail-value">${r.workType||'-'}</div></div>
+    ${r.workDetail?`<div class="detail-row"><div class="detail-label">作業詳細</div><div class="detail-value">${r.workDetail}</div></div>`:''}
+    <div class="detail-row"><div class="detail-label">作業員</div><div class="detail-value"><div class="worker-chips">${chips||'-'}</div></div></div>
+    ${(r.heavies||[]).length?`<div class="detail-row"><div class="detail-label">重機</div><div class="detail-value">${r.heavies.join('、')}</div></div>`:''}
+    ${(r.vehicles||[]).length?`<div class="detail-row"><div class="detail-label">車輌</div><div class="detail-value">${r.vehicles.join('、')}</div></div>`:''}
+    ${(r.tools||[]).length?`<div class="detail-row"><div class="detail-label">器具</div><div class="detail-value">${r.tools.join('、')}</div></div>`:''}
+    ${(r.leases||[]).length?`<div class="detail-row"><div class="detail-label">リース</div><div class="detail-value">${r.leases.join('、')}</div></div>`:''}
+    ${r.etcCard?`<div class="detail-row"><div class="detail-label">ETCカード</div><div class="detail-value">${r.etcCard}</div></div>`:''}
+    ${r.etcVehicle?`<div class="detail-row"><div class="detail-label">車両区分</div><div class="detail-value">${r.etcVehicle}</div></div>`:''}
+    ${etcText?`<div class="detail-row"><div class="detail-label">ETC区間</div><div class="detail-value">${etcText}</div></div>`:''}
+    ${(r.slips||[]).length?`<div class="detail-row"><div class="detail-label">伝票無し</div><div class="detail-value">${r.slips.map(s=>typeof s==='string'?s:(s.qty?`${s.name}（${s.qty}）`:s.name)).join('、')}</div></div>`:''}
+    <div class="detail-row"><div class="detail-label">外注依頼</div><div class="detail-value">${r.outsource||'-'}${r.outsource==='有'?' （'+(r.outsourceCo||'')+(r.outsourceOther?'/'+r.outsourceOther:'')+'）':''}</div></div>
+  `;
+  $('modal-overlay').classList.add('show');
+}
+
+function closeModal(e) { if (e.target === $('modal-overlay')) closeModalDirect(); }
+function closeModalDirect() { $('modal-overlay').classList.remove('show'); }
+
+// ===== 全削除 =====
+function clearAllData() {
+  if (!confirm('全ての日報データを削除しますか？')) return;
+  _cache.reports = [];
+  renderList();
+  fsdb.collection('reports').get().then(snap => {
+    const batch = fsdb.batch();
+    snap.docs.forEach(d => batch.delete(d.ref));
+    return batch.commit();
+  }).then(() => showToast('データを削除しました'))
+    .catch(e => { console.error('[FS] clearAll:', e); showToast('⚠️ 削除に失敗しました', true); });
+}
+
+// ===== 集計 =====
+function renderSummary() {
+  const month = $('summary-month').value;
+  let reports = getData('reports', []);
+  if (month) reports = reports.filter(r => r.date?.startsWith(month));
+
+  function parseHours(text) {
+    if (!text || text.includes('--') || text.includes('計算')) return 0;
+    const h = (text.match(/(\d+)\s*時間/) || [,0])[1];
+    const m = (text.match(/(\d+)\s*分/)   || [,0])[1];
+    return parseInt(h) + parseInt(m) / 60;
+  }
+  function fmtH(h) {
+    const hh = Math.floor(h), mm = Math.round((h - hh) * 60);
+    return mm > 0 ? `${hh}h${mm}m` : `${hh}h`;
+  }
+
+  const days = reports.length;
+  const total = reports.reduce((s, r) => s + parseHours(r.hoursText), 0);
+  $('s-days').textContent  = days + '日';
+  $('s-hours').textContent = fmtH(total);
+  $('s-avg').textContent   = days > 0 ? fmtH(total / days) : '0h';
+
+  const siteMap = {}, clientMap = {}, workerMap = {};
+  reports.forEach(r => {
+    const s = r.site   || '未入力'; siteMap[s]   = (siteMap[s]   || 0) + 1;
+    const c = r.client || '未入力'; clientMap[c] = (clientMap[c] || 0) + 1;
+    (r.workers || []).forEach(w => { workerMap[w.name] = (workerMap[w.name] || 0) + 1; });
+  });
+  renderBreakdownList('s-site-list',   siteMap,   days);
+  renderBreakdownList('s-client-list', clientMap, days);
+  renderBreakdownList('s-worker-list', workerMap, days || 1);
+}
+
+function renderBreakdownList(contId, map, maxVal) {
+  const cont = $(contId);
+  if (!cont) return;
+  const sorted = Object.entries(map).sort((a, b) => b[1] - a[1]);
+  if (!sorted.length) { cont.innerHTML = '<span style="font-size:12px;color:var(--muted);">データなし</span>'; return; }
+  cont.innerHTML = '';
+  sorted.forEach(([name, val]) => {
+    const pct = maxVal > 0 ? (val / maxVal * 100) : 0;
+    const div = document.createElement('div');
+    div.className = 'summary-row';
+    div.innerHTML = `
+      <span class="summary-row-name">${name}</span>
+      <div class="summary-bar-wrap"><div class="summary-bar-fill" style="width:${pct}%"></div></div>
+      <span class="summary-row-val">${val}日</span>`;
+    cont.appendChild(div);
+  });
+}
+
+// ===== トースト =====
+function showToast(msg, isError) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.style.background = isError ? '#c0392b' : 'var(--success)';
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>
