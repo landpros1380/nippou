@@ -79,7 +79,7 @@
     border-bottom: 2px solid var(--highlight);
   }
 
-  .content { padding: 14px; max-width: 600px; margin: 0 auto; padding-top: 110px; }
+  .content { padding: 14px; max-width: 600px; margin: 0 auto; padding-top: 128px; }
   .page { display: none; }
   .page.active { display: block; }
 
@@ -326,6 +326,8 @@
   .report-card-meta span strong { color: var(--text2); }
   .delete-report-btn { background: none; border: none; color: var(--muted2); font-size: 16px; cursor: pointer; padding: 4px; transition: color 0.2s; }
   .delete-report-btn:hover { color: var(--danger); }
+  .edit-report-btn { background: none; border: none; color: var(--muted2); font-size: 15px; cursor: pointer; padding: 4px; transition: color 0.2s; }
+  .edit-report-btn:hover { color: var(--highlight); }
   .empty-state { text-align: center; padding: 50px 20px; color: var(--muted2); }
   .empty-state .icon { font-size: 44px; margin-bottom: 14px; opacity: 0.5; }
 
@@ -725,15 +727,16 @@
       </div>
     </div>
 
-    <button class="submit-btn" onclick="saveReport()">✅ 日報を保存する</button>
+    <button id="save-btn" class="submit-btn" onclick="saveReport()">✅ 日報を保存する</button>
     <div style="height:24px;"></div>
   </div>
 
   <!-- ===== 一覧 ===== -->
   <div id="page-list" class="page">
-    <div class="filter-row" style="grid-template-columns:1fr auto;margin-bottom:10px;">
+    <div class="filter-row" style="grid-template-columns:1fr auto auto;margin-bottom:10px;">
       <input type="month" id="filter-month" onchange="renderList()">
-      <button class="list-print-btn" onclick="printList()">🖨️ 印刷</button>
+      <button class="list-print-btn" onclick="printTable()" title="一覧表印刷">🖨️ 一覧</button>
+      <button class="list-print-btn" onclick="printList()"  title="詳細印刷"  style="background:var(--accent2);">🖨️ 詳細</button>
     </div>
     <div class="filter-row" style="margin-bottom:10px;">
       <select id="filter-client" onchange="renderList()"><option value="">元請先：すべて</option></select>
@@ -993,6 +996,7 @@ const fsdb = firebase.firestore();
 
 // ===== ストレージ（メモリキャッシュ ＋ Firestore同期） =====
 const _cache = {};
+let _editingId = null;
 
 function getData(key, def) {
   return _cache.hasOwnProperty(key) ? _cache[key] : def;
@@ -1895,8 +1899,9 @@ function saveReport() {
   // 実働時間テキスト取得
   const hoursText = $('hours-display').textContent;
 
+  const isEdit = _editingId !== null;
   const report = {
-    id: Date.now(),
+    id:          isEdit ? _editingId : Date.now(),
     date:        $('f-date').value,
     weather:     $('f-weather').value,
     timeStart:   $('f-start').value,
@@ -1920,21 +1925,30 @@ function saveReport() {
   if (!report.date) { showToast('⚠️ 日付を入力してください', true); return; }
 
   const reports = getData('reports', []);
-  reports.unshift(report);
+  if (isEdit) {
+    const idx = reports.findIndex(r => r.id === _editingId);
+    if (idx >= 0) reports[idx] = report; else reports.unshift(report);
+    _editingId = null;
+    $('save-btn').textContent = '✅ 日報を保存する';
+  } else {
+    reports.unshift(report);
+  }
   setData('reports', reports);
-  // Firestoreへ保存
   fsdb.collection('reports').doc(String(report.id)).set(report)
     .catch(e => console.error('[FS] saveReport:', e));
-  // 入力済みETC区間を自動記憶
   const vt = report.etcVehicle || '普通車';
   etcRouteData.forEach(r => { if (r.from && r.to && r.amount) autoSaveEtcRoute(r.from, r.to, vt, r.amount); });
-  showToast('✅ 日報を保存しました！');
+  showToast(isEdit ? '✅ 日報を更新しました！' : '✅ 日報を保存しました！');
   resetForm();
 }
 
 // ===== リセット =====
 function resetForm() {
   clearErrors();
+  if (_editingId !== null) {
+    _editingId = null;
+    $('save-btn').textContent = '✅ 日報を保存する';
+  }
   // 使用無しリセット
   const equipMap = [
     ['cb-heavy-none',   'heavy-list',   'btn-heavy-add'],
@@ -1979,6 +1993,117 @@ function resetForm() {
   initLeaseItems();
   initSlipItems();
   initEtcRoutes();
+}
+
+// ===== 編集 =====
+function editReport(r) {
+  _editingId = r.id;
+  resetForm();
+
+  // 基本項目
+  $('f-date').value    = r.date || '';
+  $('f-weather').value = r.weather || '';
+  $('f-start').value   = r.timeStart || '08:00';
+  $('f-end').value     = r.timeEnd || '17:30';
+  calcHours();
+  $('f-client').value      = r.client || '';
+  $('f-site').value        = r.site || '';
+  $('f-work-detail').value = r.workDetail || '';
+
+  // 作業内容ラジオ
+  document.querySelectorAll('input[name="work-type"]').forEach(radio => {
+    radio.checked = radio.value === r.workType;
+  });
+  updateRadio();
+
+  // 作業員
+  $('worker-list').innerHTML = '';
+  (r.workers && r.workers.length ? r.workers : [{}]).forEach(w => {
+    addWorkerRow();
+    const rows = $('worker-list').querySelectorAll('.worker-item');
+    const last = rows[rows.length - 1];
+    if (w.name) {
+      last.querySelector('select').value = w.name;
+      const chk = last.querySelector('input[type="checkbox"]');
+      if (chk) chk.checked = !!w.checked;
+    }
+  });
+
+  // 機材（使用無しの場合はチェック、有りの場合は行を埋める）
+  const equipDefs = [
+    { cbId:'cb-heavy-none',   listId:'heavy-list',   btnId:'btn-heavy-add',  key:'heavies',  items: r.heavies  || [] },
+    { cbId:'cb-vehicle-none', listId:'vehicle-list',  btnId:'btn-vehicle-add',key:'vehicles', items: r.vehicles || [] },
+    { cbId:'cb-tools-none',   listId:'tools-list',    btnId:'btn-tools-add',  key:'toolsList',items: r.tools    || [] },
+    { cbId:'cb-lease-none',   listId:'lease-items',   btnId:'btn-lease-add',  key:'leases',   items: r.leases   || [] },
+  ];
+  equipDefs.forEach(({ cbId, listId, btnId, key, items }) => {
+    const cb = $(cbId);
+    if (items.length === 0) {
+      cb.checked = true;
+      toggleEquipNone(listId, btnId, cb);
+    } else {
+      cb.checked = false;
+      toggleEquipNone(listId, btnId, cb);
+      $(listId).innerHTML = '';
+      items.forEach((val, i) => {
+        if (key === 'leases') addLease(); else addEquipRow(listId, key);
+        const rows = $(listId).querySelectorAll('.equip-item');
+        rows[rows.length - 1].querySelector('select').value = val;
+      });
+    }
+  });
+
+  // ETC
+  const etcNoneCb = $('cb-etc-none');
+  etcNoneCb.checked = !!r.etcNone;
+  $('etc-body').style.display = r.etcNone ? 'none' : '';
+  if (!r.etcNone) {
+    const etcCards = getData('etcCards', []);
+    const cardIdx  = etcCards.findIndex(c => `${c.company}（${c.num}）` === r.etcCard);
+    $('f-etc-card').value = cardIdx >= 0 ? String(cardIdx) : '';
+    if (r.etcVehicle) {
+      const radio = document.querySelector(`input[name="etc-vehicle"][value="${r.etcVehicle}"]`);
+      if (radio) { radio.checked = true; updateEtcVehicle(); }
+    }
+    $('etc-routes').innerHTML = '';
+    (r.etcRoutes || []).forEach(route => {
+      addEtcRoute();
+      const rows = $('etc-routes').querySelectorAll('.etc-route-item');
+      const last = rows[rows.length - 1];
+      last.querySelector('.etc-from-sel').value = route.from || '';
+      last.querySelector('.etc-to-sel').value   = route.to   || '';
+      last.querySelector('.etc-amt-inp').value  = route.amount || '';
+    });
+    if (!$('etc-routes').querySelectorAll('.etc-route-item').length) addEtcRoute();
+  }
+
+  // 在庫伝票
+  $('slip-items').innerHTML = '';
+  (r.slips || []).forEach(s => {
+    addSlip();
+    const items = $('slip-items').querySelectorAll('.list-item');
+    const last = items[items.length - 1];
+    const nameVal = typeof s === 'string' ? s : s.name;
+    const qtyVal  = typeof s === 'string' ? '' : s.qty;
+    last.querySelector('.slip-name').value = nameVal || '';
+    last.querySelector('.slip-qty').value  = qtyVal  || '';
+  });
+  if (!$('slip-items').querySelectorAll('.list-item').length) addSlip();
+
+  // 外注
+  if (r.outsource) {
+    const radio = document.querySelector(`input[name="outsource"][value="${r.outsource}"]`);
+    if (radio) { radio.checked = true; updateOutsource(); }
+    $('f-outsource-co').value    = r.outsourceCo    || '';
+    $('f-outsource-other').value = r.outsourceOther || '';
+  }
+
+  // 保存ボタンを「更新」表示に変えてフォームへ移動
+  $('save-btn').textContent = '💾 日報を更新する';
+  closeModalDirect();
+  showPage('input');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  showToast('📝 編集モード：変更後に「更新」ボタンを押してください');
 }
 
 // ===== 一覧 =====
@@ -2029,9 +2154,10 @@ function renderList() {
     card.innerHTML = `
       <div class="report-card-header">
         <span class="report-card-date">${r.date} ${wIcon} ${r.weather||''}</span>
-        <div style="display:flex;align-items:center;gap:8px;">
+        <div style="display:flex;align-items:center;gap:4px;">
           <span class="report-card-site">${r.site||'現場名未入力'}</span>
-          <button class="delete-report-btn" onclick="deleteReport(${r.id},event)">🗑️</button>
+          <button class="edit-report-btn" title="編集">✏️</button>
+          <button class="delete-report-btn" title="削除" onclick="deleteReport(${r.id},event)">🗑️</button>
         </div>
       </div>
       <div class="report-card-body">
@@ -2043,28 +2169,40 @@ function renderList() {
         </div>
         ${r.workDetail?`<div style="margin-top:8px;font-size:12px;color:var(--muted);">${r.workDetail.slice(0,60)}${r.workDetail.length>60?'…':''}</div>`:''}
       </div>`;
+    card.querySelector('.edit-report-btn').addEventListener('click', e => { e.stopPropagation(); editReport(r); });
     card.querySelector('.report-card-header').addEventListener('click', () => showDetail(r));
     card.querySelector('.report-card-body').addEventListener('click', () => showDetail(r));
     cont.appendChild(card);
   });
 }
 
-function printList() {
+function getFilteredReports() {
   const all    = getData('reports', []);
   const month  = $('filter-month').value;
   const client = $('filter-client').value;
   const site   = $('filter-site').value;
   const worker = $('filter-worker').value;
-
-  let reports = all;
+  let reports  = all;
   if (month)  reports = reports.filter(r => r.date?.startsWith(month));
   if (client) reports = reports.filter(r => r.client === client);
   if (site)   reports = reports.filter(r => r.site === site);
   if (worker) reports = reports.filter(r => (r.workers||[]).some(w => w.name === worker));
+  return reports;
+}
 
-  const conds = [month, client, site, worker ? `作業員：${worker}` : ''].filter(Boolean);
-  const title = 'LAND PROS 作業日報一覧' + (conds.length ? '　' + conds.join(' / ') : '');
+function getPrintTitle() {
+  const month  = $('filter-month').value;
+  const client = $('filter-client').value;
+  const site   = $('filter-site').value;
+  const worker = $('filter-worker').value;
+  const conds  = [month, client, site, worker ? `作業員：${worker}` : ''].filter(Boolean);
+  return 'LAND PROS 作業日報' + (conds.length ? '　' + conds.join(' / ') : '');
+}
 
+// ===== 一覧表印刷（日付・元請先・現場名・作業内容・作業員・実働時間）=====
+function printTable() {
+  const reports = getFilteredReports();
+  const title   = getPrintTitle() + '　一覧表';
   const rows = reports.map(r => `
     <tr>
       <td>${r.date||''}</td>
@@ -2074,19 +2212,18 @@ function printList() {
       <td>${(r.workers||[]).map(w=>w.name).join('、')||'-'}</td>
       <td>${r.hoursText||'-'}</td>
     </tr>`).join('');
-
   const win = window.open('', '_blank');
   win.document.write(`<!DOCTYPE html>
 <html lang="ja"><head><meta charset="utf-8"><title>${title}</title>
 <style>
   body { font-family: 'Helvetica Neue',Arial,'Hiragino Kaku Gothic ProN',sans-serif; font-size: 12px; margin: 20px; color: #333; }
-  h2 { font-size: 15px; margin-bottom: 4px; }
+  h2 { font-size: 15px; margin-bottom: 4px; border-bottom: 2px solid #333; padding-bottom: 6px; }
   .sub { font-size: 10px; color: #888; margin-bottom: 14px; }
   table { width: 100%; border-collapse: collapse; }
-  th { background: #333; color: #fff; padding: 7px 8px; text-align: left; font-size: 11px; }
-  td { border: 1px solid #ddd; padding: 6px 8px; }
+  th { background: #333; color: #fff; padding: 7px 8px; text-align: left; font-size: 11px; white-space: nowrap; }
+  td { border: 1px solid #ddd; padding: 6px 8px; vertical-align: top; }
   tr:nth-child(even) td { background: #f8f8f8; }
-  @media print { @page { margin: 10mm; } }
+  @media print { @page { margin: 10mm; size: A4 landscape; } }
 </style></head><body>
 <h2>${title}</h2>
 <div class="sub">印刷日時：${new Date().toLocaleString('ja-JP')}　全${reports.length}件</div>
@@ -2096,6 +2233,65 @@ function printList() {
   </tr></thead>
   <tbody>${rows}</tbody>
 </table>
+</body></html>`);
+  win.document.close();
+  win.focus();
+  win.print();
+}
+
+// ===== 詳細印刷（全項目）=====
+function printList() {
+  const reports = getFilteredReports();
+  const title   = getPrintTitle() + '　詳細';
+
+  function row(label, value) {
+    return `<tr><th>${label}</th><td>${value||'-'}</td></tr>`;
+  }
+
+  const sections = reports.map(r => {
+    const etcText = (r.etcRoutes||[]).filter(x=>x.from||x.to)
+      .map(x=>`${x.from||'?'} → ${x.to||'?'}${x.amount?' '+parseInt(x.amount).toLocaleString()+'円':''}`).join('、');
+    const workers = (r.workers||[]).map(w => w.name + (w.checked?' ✓':'')).join('、') || '-';
+    return `
+    <div class="report-section">
+      <div class="report-title">${r.date||''}　${r.weather||''}　${r.site||''}</div>
+      <table>
+        ${row('勤務時間', (r.timeStart||'') + (r.timeEnd?' ～ '+r.timeEnd:'') + '　' + (r.hoursText||''))}
+        ${row('元請先', r.client)}
+        ${row('現場名', r.site)}
+        ${row('作業内容', r.workType)}
+        ${r.workDetail ? row('作業詳細', r.workDetail) : ''}
+        ${row('作業員', workers)}
+        ${row('重機', (r.heavies||[]).join('、')||'－')}
+        ${row('車輌', (r.vehicles||[]).join('、')||'－')}
+        ${row('器具', (r.tools||[]).join('、')||'－')}
+        ${row('リース', (r.leases||[]).join('、')||'－')}
+        ${row('ETCカード', r.etcNone ? '－' : (r.etcCard||'－'))}
+        ${r.etcVehicle && r.etcCard && !r.etcNone ? row('車両区分', r.etcVehicle) : ''}
+        ${!r.etcNone && etcText ? row('ETC区間', etcText) : ''}
+        ${(r.slips||[]).length ? row('伝票無し', r.slips.map(s=>typeof s==='string'?s:(s.qty?`${s.name}（${s.qty}）`:s.name)).join('、')) : ''}
+        ${row('外注依頼', r.outsource||'-')}
+      </table>
+    </div>`;
+  }).join('');
+
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8"><title>${title}</title>
+<style>
+  body { font-family: 'Helvetica Neue',Arial,'Hiragino Kaku Gothic ProN',sans-serif; font-size: 12px; margin: 16px; color: #333; }
+  h2 { font-size: 15px; margin-bottom: 4px; border-bottom: 2px solid #333; padding-bottom: 6px; }
+  .sub { font-size: 10px; color: #888; margin-bottom: 14px; }
+  .report-section { margin-bottom: 18px; page-break-inside: avoid; }
+  .report-title { font-size: 13px; font-weight: bold; background: #f0f0f0; padding: 6px 10px; border-left: 4px solid #333; margin-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; }
+  th { background: #fafafa; color: #555; padding: 5px 8px; text-align: left; font-size: 10px; width: 90px; border: 1px solid #ddd; font-weight: bold; }
+  td { border: 1px solid #ddd; padding: 5px 8px; font-size: 12px; }
+  @media print { @page { margin: 10mm; } }
+</style></head><body>
+<h2>${title}</h2>
+<div class="sub">印刷日時：${new Date().toLocaleString('ja-JP')}　全${reports.length}件</div>
+${sections}
 </body></html>`);
   win.document.close();
   win.focus();
