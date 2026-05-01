@@ -1884,8 +1884,9 @@ function saveReport() {
     workType:    document.querySelector('input[name="work-type"]:checked')?.value || '',
     workDetail:  $('f-work-detail').value,
     workers, heavies, vehicles, tools, leases, slips,
+    etcNone:     etcNone,
     etcCard:     etcCard ? `${etcCard.company}（${etcCard.num}）` : '',
-    etcVehicle:  getEtcVehicleType(),
+    etcVehicle:  etcNone ? '' : getEtcVehicleType(),
     etcRoutes:   etcRouteData,
     outsource:   document.querySelector('input[name="outsource"]:checked')?.value || '',
     outsourceCo: $('f-outsource-co').value,
@@ -2022,13 +2023,13 @@ function showDetail(r) {
     <div class="detail-row"><div class="detail-label">作業内容</div><div class="detail-value">${r.workType||'-'}</div></div>
     ${r.workDetail?`<div class="detail-row"><div class="detail-label">作業詳細</div><div class="detail-value">${r.workDetail}</div></div>`:''}
     <div class="detail-row"><div class="detail-label">作業員</div><div class="detail-value"><div class="worker-chips">${chips||'-'}</div></div></div>
-    ${(r.heavies||[]).length?`<div class="detail-row"><div class="detail-label">重機</div><div class="detail-value">${r.heavies.join('、')}</div></div>`:''}
-    ${(r.vehicles||[]).length?`<div class="detail-row"><div class="detail-label">車輌</div><div class="detail-value">${r.vehicles.join('、')}</div></div>`:''}
-    ${(r.tools||[]).length?`<div class="detail-row"><div class="detail-label">器具</div><div class="detail-value">${r.tools.join('、')}</div></div>`:''}
-    ${(r.leases||[]).length?`<div class="detail-row"><div class="detail-label">リース</div><div class="detail-value">${r.leases.join('、')}</div></div>`:''}
-    ${r.etcCard?`<div class="detail-row"><div class="detail-label">ETCカード</div><div class="detail-value">${r.etcCard}</div></div>`:''}
-    ${r.etcVehicle?`<div class="detail-row"><div class="detail-label">車両区分</div><div class="detail-value">${r.etcVehicle}</div></div>`:''}
-    ${etcText?`<div class="detail-row"><div class="detail-label">ETC区間</div><div class="detail-value">${etcText}</div></div>`:''}
+    <div class="detail-row"><div class="detail-label">重機</div><div class="detail-value">${(r.heavies||[]).length ? r.heavies.join('、') : '－'}</div></div>
+    <div class="detail-row"><div class="detail-label">車輌</div><div class="detail-value">${(r.vehicles||[]).length ? r.vehicles.join('、') : '－'}</div></div>
+    <div class="detail-row"><div class="detail-label">器具</div><div class="detail-value">${(r.tools||[]).length ? r.tools.join('、') : '－'}</div></div>
+    <div class="detail-row"><div class="detail-label">リース</div><div class="detail-value">${(r.leases||[]).length ? r.leases.join('、') : '－'}</div></div>
+    <div class="detail-row"><div class="detail-label">ETCカード</div><div class="detail-value">${r.etcNone ? '－' : (r.etcCard || '－')}</div></div>
+    ${!r.etcNone && r.etcVehicle ? `<div class="detail-row"><div class="detail-label">車両区分</div><div class="detail-value">${r.etcVehicle}</div></div>` : ''}
+    ${!r.etcNone && etcText ? `<div class="detail-row"><div class="detail-label">ETC区間</div><div class="detail-value">${etcText}</div></div>` : ''}
     ${(r.slips||[]).length?`<div class="detail-row"><div class="detail-label">伝票無し</div><div class="detail-value">${r.slips.map(s=>typeof s==='string'?s:(s.qty?`${s.name}（${s.qty}）`:s.name)).join('、')}</div></div>`:''}
     <div class="detail-row"><div class="detail-label">外注依頼</div><div class="detail-value">${r.outsource||'-'}${r.outsource==='有'?' （'+(r.outsourceCo||'')+(r.outsourceOther?'/'+r.outsourceOther:'')+'）':''}</div></div>
   `;
